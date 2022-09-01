@@ -9,10 +9,9 @@ from sklearn.model_selection import train_test_split
 
 def get_absence_slots_from_presence_rois(df, 
                                         wl, 
-                                        max_t):
+                                        max_duration):
     
     """
-    
     Compute the complement of ROIs in a dataframe. It is assumed that complemement means 'ABSENCE' class
     
     Parameters
@@ -22,18 +21,17 @@ def get_absence_slots_from_presence_rois(df,
         comes from audacity annotations. The columns are 'min_t', 'max_t', 'fname', and 'label' 
     wl : int
         Window length. In general is the same as the window lenght used in df
-    max_t : int
+    max_duration : int
         Total length of raw recordings. It assumes that all recordings have the same duration
     Returns
     -------
     df_absence_slots : pandas.core.frame.DataFrame
         Dataframe composed of the recordings complement of df. The label is 'ABSENCE'
-        
     """
     
     df['segment_label'] = df.apply(lambda x: list(range(int(x['min_t']),int(x['max_t']+1))),axis=1)
     df = df.groupby(['fname'])['segment_label'].apply(sum).to_frame().reset_index()
-    df['absence_space'] = df['segment_label'].apply(lambda x: sorted(set(range(max_t+1))-set(x)))
+    df['absence_space'] = df['segment_label'].apply(lambda x: sorted(set(range(max_duration+1))-set(x)))
     
     absence_slots = []
     for idx, x in df.iterrows():
@@ -48,12 +46,77 @@ def get_absence_slots_from_presence_rois(df,
     
     return df_absence_slots
 
+
+def get_absence_slots_from_planilha(n_sample, 
+                                    wl,
+                                    max_duration,
+                                    site,
+                                    labels_cols):
+    
+    """    
+    Compute the complement of ROIs in a dataframe. It is assumed that complemement means 'ABSENCE' class
+    
+    Parameters
+    ----------
+    n_sample : int
+        gasas
+    wl : int
+        Window length. In general is the same as the window lenght used in df
+    max_duration : int
+        Total length of raw recordings. It assumes that all recordings have the same duration
+    site : list
+        Total length of raw recordings. It assumes that all recordings have the same duration
+    labels_cols : list
+        Daticos
+    Returns
+    -------
+    df_absence_rois_from_planilha : pandas.core.frame.DataFrame
+        Dataframe composed of the recordings complement of df. The label is 'ABSENCE'   
+    """
+    # Add new species with a standarized name
+    dictionary_of_species = {'Boa_fab':'BOAFAB', 
+                             'Phy_cuv':'PHYCUV'}
+    # Dont use quality annotation, just the species
+    labels_cols = [i.split('_',1)[0] for i in labels_cols]
+    
+    df_planilha = pd.read_excel('data/Planilha_INCT_Anderson_Selvino.xlsx',
+                                engine='openpyxl')
+    df_planilha = df_planilha.rename(columns=dictionary_of_species)
+    df_planilha = df_planilha[df_planilha['gravador'].isin(site)]
+    df_planilha = df_planilha[['gravacao_id']+labels_cols]
+    df_planilha['label'] = df_planilha[labels_cols].sum(axis=1).apply(lambda x: 'ABSENCE' if x ==0 else 'PRESENCE')
+    
+    df_planilha_absence = df_planilha[df_planilha['label']=='ABSENCE']
+    df_planilha_absence = df_planilha_absence[['gravacao_id','label']]
+    df_planilha_absence = df_planilha_absence.rename(columns={'gravacao_id':'fname'})
+    df_planilha_absence['min_t'] = 0
+    df_planilha_absence['max_t'] = max_duration
+    # check if we could delete next two lines, In which cases it would be useful?
+    df_planilha_absence['min_f'] = np.nan
+    df_planilha_absence['max_f'] = np.nan
+    
+    df_absence_rois_from_planilha = batch_format_rois(df_planilha_absence, wl=wl)
+    
+    # Maybe we can use an additional function to check the coherence
+     #gravacao_in_planilha = set(df_planilha[df_planilha['label']==1]['gravacao_id'])
+    #absence_in_planilha = set(df_planilha[df_planilha['label']==1]['gravacao_id'])
+    # df_planilha['absence'].value_counts()
+    # check if gravacao in planilha not annotated
+    # gravacao_in_planilha - 
+    # check if annotated file not in planilha
+    # - gravacao_in_planilha
+    # check if some recording not identified in planilha
+    # recordings-(absence_in_planilha | gravacao_in_planilha)
+    # check if some recording not identified in planilha
+    # (absence_in_planilha | gravacao_in_planilha)-recordings
+
+    return df_absence_rois_from_planilha.sample(n=n_sample)#, ignore_index=True)
+
 def stratified_split_train_test(df, 
                                 x_name, 
                                 y_name):
     
     """
-    
     Split dataset using stratified sampling and add a column called 'dataset' 
     where specify if sample is in train or test subset.
     
@@ -68,8 +131,7 @@ def stratified_split_train_test(df,
     Returns
     -------
     df_compiled : pandas.core.frame.DataFrame
-        Formated regions of interest with fixed size.
-        
+        Formated regions of interest with fixed size
     """
 
     X = df[x_name]
