@@ -18,8 +18,16 @@ from os import listdir
 from os.path import isfile, join
 
 
-def plot_listen_examples(path_audio):
-    
+def plot_listen_examples(path_audio,
+                         n_fft = 1024,
+                         hop_length = 256, 
+                         n_mels = 128,
+                         f_min = 50,
+                         f_max = 4000,
+                         power=1.0
+                        ):
+
+    """
     # length of the FFT window
     n_fft = 1024
     # number of samples between successive frames.
@@ -31,25 +39,25 @@ def plot_listen_examples(path_audio):
     f_max = 4000
     # Exponent for the magnitude melspectrogram. e.g., 1 for energy, 2 for power, etc.
     # power = 
-    
+    """
     
     if '.wav' in path_audio:
-        print('wav')
         y, sr = sound.load(path_audio)
+        file = path_audio
     else:
         audio_files = [f for f in listdir(path_audio) if isfile(join(path_audio, f))]
         audio_files = [i for i in audio_files if '.wav' in i]
         file = random.choice(audio_files)
         y, sr = sound.load(join(path_audio, file))
         
-    S = librosa.feature.melspectrogram(y=y,sr=sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels, power=1.0,
+    S = librosa.feature.melspectrogram(y=y,sr=sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels, power=power,
                                        fmin=f_min, fmax=f_max)
     
     fig, ax = plt.subplots()
     img = librosa.display.specshow(S, x_axis='time',y_axis='mel',sr=sr, ax=ax,
                                    fmax=f_max)
     #fig.colorbar(img,ax=ax, format='%+2.0f dB')
-    ax.set(title='Mel-frequency spectrogram of '+file.split('wav')[0])
+    ax.set(title='Mel-frequency spectrogram of '+path_audio.split('wav')[0])
     plt.show()
     display(Audio(data=y, rate=sr))
     
@@ -144,8 +152,8 @@ def roi2windowed(wl, roi):
     if roi_len < wl:
         # region shorter than window length
         roi_median = roi.min_t + roi_len/2
-        roi.loc['min_t'] = roi_median - wl/2
-        roi.loc['max_t'] = roi_median + wl/2
+        roi.loc['min_t'] = roi.min_t #roi_median - wl/2
+        roi.loc['max_t'] = roi.min_t + wl #roi_median + wl/2
         roi_fmt = roi.to_frame().T
     
     else:
@@ -206,6 +214,40 @@ def rois_windowed(wl, step, tlims=(0, 60), flims=(0, 22050), rois_annot=None, tn
             #rois.loc[idx_min_t & idx_max_t, 'label'] = row.label
 
     return rois
+
+
+def batch_write_samples(rois, 
+                        wav_path, 
+                        target_sr,
+                        path_save,
+                        flims,
+                        verbose=False):
+    
+    for idx, roi in rois.iterrows():
+        
+        if verbose:
+            print(find_file(roi.fname+'.wav', search_path=wav_path))
+        s, fs = sound.load(find_file(roi.fname, search_path=wav_path))
+    
+        # Preprocessing operations
+        s_trim = sound.trim(s, target_sr, min_t=roi.min_t, max_t=roi.max_t, pad=True)
+        s_resampled = sound.resample(s_trim, fs, target_sr)
+        s_filtered = maad.sound.select_bandwidth(s_resampled,target_sr,fcut=flims, forder=5, fname ='butter', ftype='bandpass')
+        s_normalized = sound.normalize(s_filtered, max_amp=0.7)
+
+        fname_save = os.path.join(path_save, roi.fname_sample)
+        sound.write(fname_save, target_sr, s_normalized, bit_depth=16)
+        
+def batch_format_rois(df, wl):
+    """ format rois to a fixed length window"""
+    rois_fmt = pd.DataFrame()
+    for idx, roi in df.iterrows():
+        roi_fmt = roi2windowed(wl, roi)
+        roi_fmt['fname'] = roi.fname
+        rois_fmt = rois_fmt.append(roi_fmt)
+
+    rois_fmt.reset_index(inplace=True, drop=True)
+    return rois_fmt
 
 def find_file(filename, search_path):
     """
