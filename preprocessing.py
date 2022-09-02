@@ -7,8 +7,6 @@ from itertools import groupby
 from operator import itemgetter
 
 from maad.util import read_audacity_annot
-#power2dB, , format_features, overlay_rois
-#from librosa import get_duration, get_samplerate
 from sklearn.model_selection import train_test_split
 
 from utils import batch_format_rois
@@ -119,7 +117,46 @@ def get_absence_slots_from_presence_rois(df,
     return df_absence_slots
 
 
-def get_absence_slots_from_planilha(n_sample, 
+def get_available_files(wav_path,
+                       report=False):
+    
+    """
+    Compute the complement of ROIs in a dataframe. It is assumed that complemement means 'ABSENCE' class
+    
+    Parameters
+    ----------
+     wav_path : str
+        Path of folder that contains recording files. We expect .wav format 
+     report : bool
+         Print report of coherence between planilha and recordings
+     Returns
+    -------
+    df_absence_rois_from_planilha : pandas.core.frame.DataFrame
+        Dataframe composed of the recordings complement of df. The label is 'ABSENCE'   
+    """
+    df_planilha = pd.read_excel('data/Planilha_INCT_Anderson_Selvino.xlsx',
+                                engine='openpyxl')
+    
+    files_in_planilha = set(df_planilha['gravacao_id'])
+    files_in_folder = set([f.split('.wav')[0] for f in listdir(wav_path) if isfile(join(wav_path, f))])
+    file_in_both = files_in_planilha & files_in_folder
+    
+    #if report:
+        # df_planilha['absence'].value_counts()
+        # check if gravacao in planilha not annotated
+        # gravacao_in_planilha - 
+        # check if annotated file not in planilha
+        # - gravacao_in_planilha
+        # check if some recording not identified in planilha
+        # recordings-(absence_in_planilha | gravacao_in_planilha)
+        # check if some recording not identified in planilha
+        # (absence_in_planilha | gravacao_in_planilha)-recordings
+    
+    return list(file_in_both)
+
+
+def get_absence_slots_from_planilha(n_sample,
+                                    wav_path, # call function or use output as parameter?
                                     wl,
                                     max_duration,
                                     site,
@@ -132,6 +169,8 @@ def get_absence_slots_from_planilha(n_sample,
     ----------
     n_sample : int
         gasas
+     wav_path : str
+        Path of folder that contains recording files. We expect .wav format 
     wl : int
         Window length. In general is the same as the window lenght used in df
     max_duration : int
@@ -150,11 +189,13 @@ def get_absence_slots_from_planilha(n_sample,
                              'Phy_cuv':'PHYCUV'}
     # Dont use quality annotation, just the species
     labels_cols = [i.split('_',1)[0] for i in labels_cols]
+    available_recordings = get_available_files(wav_path)
     
     df_planilha = pd.read_excel('data/Planilha_INCT_Anderson_Selvino.xlsx',
                                 engine='openpyxl')
     df_planilha = df_planilha.rename(columns=dictionary_of_species)
     df_planilha = df_planilha[df_planilha['gravador'].isin(site)]
+    df_planilha = df_planilha[df_planilha['gravacao_id'].isin(available_recordings)]
     df_planilha = df_planilha[['gravacao_id']+labels_cols]
     df_planilha['label'] = df_planilha[labels_cols].sum(axis=1).apply(lambda x: 'ABSENCE' if x ==0 else 'PRESENCE')
     
@@ -168,20 +209,7 @@ def get_absence_slots_from_planilha(n_sample,
     df_planilha_absence['max_f'] = np.nan
     
     df_absence_rois_from_planilha = batch_format_rois(df_planilha_absence, wl=wl)
-    
-    # Maybe we can use an additional function to check the coherence
-     #gravacao_in_planilha = set(df_planilha[df_planilha['label']==1]['gravacao_id'])
-    #absence_in_planilha = set(df_planilha[df_planilha['label']==1]['gravacao_id'])
-    # df_planilha['absence'].value_counts()
-    # check if gravacao in planilha not annotated
-    # gravacao_in_planilha - 
-    # check if annotated file not in planilha
-    # - gravacao_in_planilha
-    # check if some recording not identified in planilha
-    # recordings-(absence_in_planilha | gravacao_in_planilha)
-    # check if some recording not identified in planilha
-    # (absence_in_planilha | gravacao_in_planilha)-recordings
-
+   
     return df_absence_rois_from_planilha.sample(n=n_sample)#, ignore_index=True)
 
 def stratified_split_train_test(df, 
