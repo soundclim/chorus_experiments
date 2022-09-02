@@ -190,7 +190,7 @@ def get_absence_slots_from_planilha(n_sample,
     dictionary_of_species = {'Boa_fab':'BOAFAB', 
                              'Phy_cuv':'PHYCUV'}
     # Dont use quality annotation, just the species
-    labels_cols = [i.split('_',1)[0] for i in labels_cols]
+    labels_cols = list(set([i.split('_',1)[0] for i in labels_cols]))
     available_recordings = get_available_files(wav_path)
     
     df_planilha = pd.read_excel('data/Planilha_INCT_Anderson_Selvino.xlsx',
@@ -364,3 +364,119 @@ def build_binary_dataset(wav_path,
         # save parameters
     else:
         warn("Different size between recordings extracted and samples!!")  
+        
+def build_binary_dataset(wav_path, 
+                         annotation_path, 
+                         wl, 
+                         target_sr, 
+                         flims, 
+                         max_duration,
+                         site,
+                         path_save, 
+                         labels_cols, 
+                         prefix,
+                         verbose=False):
+    """
+    # BEFORE DOCUMENTATION, SHOULD WE USE THIS PART AS A CLASS?
+    Parameters 
+    ---------- 
+    wav_file : str
+        Path of recording file. 
+        We expect .wav format
+    annotation_file : str
+        Path of annotation file. 
+        We expect an annotation if .txt format from Audacity
+    
+    wl : int
+        Fixed window lenght to split the recording
+    target_sr : int
+        Sampling rate to convert the audio file
+    flims : list
+        List composed of [minimun_frequency, maximun_frequency] in Hz
+    labels_cols : list
+        If False return multiclass dataset, in other case return dataset of label specified
+        
+    Returns 
+    ------- 
+    df_compiled : pandas.core.frame.DataFrame
+        Popurri
+    """
+
+    df_all_annotations = load_annotations(path_annot=annotation_path, 
+                                          verbose=verbose)
+    
+    df_all_annotations = df_all_annotations[df_all_annotations['label'].isin(labels_cols)]
+    
+    df_presence_rois = batch_format_rois(df=df_all_annotations, 
+                                         wl=wl)
+
+    df_absence_slots = get_absence_slots_from_presence_rois(df=df_presence_rois, 
+                                                           wl=wl, 
+                                                           max_duration=max_duration)
+
+    df_absence_in_presence_files = batch_format_rois(df=df_absence_slots, 
+                                                     wl=wl)
+
+
+    presence_samples = df_presence_rois.shape[0]
+    absence_samples_in_presence_files = df_absence_in_presence_files.shape[0]
+    absence_samples_in_absence_files = presence_samples - absence_samples_in_presence_files
+
+    if absence_samples_in_absence_files>0:
+
+        df_dataset_presence = pd.concat([df_presence_rois,df_absence_in_presence_files])
+
+        df_absence_rois_from_planilha = get_absence_slots_from_planilha(n_sample=absence_samples_in_absence_files,
+                                                          wav_path=wav_path, 
+                                                          wl=wl,
+                                                          max_duration=max_duration,
+                                                          site=site,
+                                                          labels_cols=labels_cols)
+        
+        df_dataset = pd.concat([df_dataset_presence, df_absence_rois_from_planilha],
+                           ignore_index=True)
+    else:
+        df_absence_in_presence_files = df_absence_in_presence_files.sample(n=presence_samples)
+        df_dataset = pd.concat([df_presence_rois,df_absence_in_presence_files])
+
+    dataset_size = df_dataset.shape[0]
+    exponent_of_10 = int(np.ceil(np.log10(dataset_size)))
+    sample_names = prefix + df_dataset.index.astype(str).str.zfill(exponent_of_10) + '.wav'
+    df_dataset.insert(loc=0, 
+                      column='sample_name', 
+                      value=sample_names)
+    df_dataset['dummy'] = 1 
+    df_dataset = df_dataset.pivot_table('dummy', ['sample_name','fname','min_t','max_t'], 'label').fillna(0).reset_index()
+    df_dataset[['site','date']] = df_dataset['fname'].str.split('_',1,expand=True)
+    df_dataset['date'] = df_dataset['date'].str.split('_').apply(lambda x: x[0]+x[1])
+    df_dataset['date'] = pd.to_datetime(df_dataset['date'])
+    
+    df_compiled = stratified_split_train_test(df=df_dataset, 
+                                              x_name='sample_name', 
+                                              y_name=labels_cols[0])
+    """
+    if not exists(path_save):
+        makedirs(path_save)
+   
+    batch_write_samples(df_dataset, 
+                        wav_path=wav_path, 
+                        target_sr=target_sr,
+                        path_save=path_save,
+                        flims=flims, 
+                        verbose=True)
+    
+   
+    
+    
+    samples_len = len([f for f in listdir(path_save) if isfile(join(path_save, f))])
+    df_len = df_compiled.shape[0]
+    
+    if samples_len==df_len:
+        df_compiled.to_csv(path_save+'df_train_test_files.csv', index=False)
+        print("Datased created in ", path_save)
+        return df_compiled
+        # save parameters
+    else:
+        warn("Different size between recordings extracted and samples!!")  
+    """
+    return df_compiled
