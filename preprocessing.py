@@ -1,13 +1,83 @@
 import numpy as np
 import pandas as pd
 
+from os import listdir
+from os.path import isfile, join
 from itertools import groupby
 from operator import itemgetter
 
+from maad.util import read_audacity_annot
+#power2dB, , format_features, overlay_rois
+#from librosa import get_duration, get_samplerate
 from sklearn.model_selection import train_test_split
 
 from utils import batch_format_rois
 from utils import batch_write_samples
+
+def load_annotations(path_annot, 
+                     verbose=False):
+    
+    """
+    Load all audacity annotations on a folder
+    
+    Parameters
+    ----------
+    path_annot : str
+        Path where annotations are located
+    ...
+    Returns
+    -------
+    df_all_annotations : pandas.core.frame.DataFrame
+        Dataframe composed of the annotations from audacity
+    """
+    
+    annotation_files = [f for f in listdir(path_annot) if isfile(join(path_annot, f))]
+    """
+    It is clean and useful use this part?
+    if verbose:
+        print('Number of files:',len(annotation_files))
+        files = [i.split('.')[-1] for i in annotation_files]
+        print('Fortmats:',set(files))
+        print()
+        print('Frequency of files:',pd.Series(files).value_counts())
+        files_names = [i.split('.')[0] for i in annotation_files]
+        print()
+        print('Unique names:',len(files_names))
+    """
+    fnames_list = []
+    df_all_annotations = pd.DataFrame()
+    for file in annotation_files:
+        # It is clean and useful use this part?
+        #y, sr = sound.load(recordings_folder+file.split('.')[0]+'.wav')
+        #duration = round(get_duration(y=y, sr=sr))
+        #if sr != 22050:
+        #    print(sr, file)
+        #if duration != 60:
+        #    print(duration, file)
+        #Sxx_power, tn, fn, ext = sound.spectrogram(s, fs, nperseg=1024, noverlap=1024//2)
+        #Sxx_db = power2dB(Sxx_power) + 96 # why 96?
+        df_annotation_file = read_audacity_annot(path_annot+file) 
+        #df_rois = format_features(df_rois, tn, fn) # neccesary????????????
+        fnames_list.extend([file.split('.')[0]]*df_annotation_file.shape[0])
+        df_all_annotations = df_all_annotations.append(df_annotation_file,ignore_index=True) 
+    
+    df_all_annotations.insert(loc=0, column='fname', value=fnames_list)
+    df_all_annotations['min_t'] = np.floor(df_all_annotations['min_t'])
+    df_all_annotations['max_t'] = np.ceil(df_all_annotations['max_t'])
+    df_all_annotations = df_all_annotations.sort_values(by=['fname','min_t','max_t'],ignore_index=True)
+    
+    # This part could be included in the dashboard or other part!
+    #df_all_annotations[['site','date']] = df_all_annotations['fname'].str.split('_',1)
+    #df_all_annotations['date'] = df_all_annotations['date'].str.split('_').apply(lambda x: x[0]+x[1])
+    #df_all_annotations['date'] = pd.to_datetime(df_all_annotations['date'])
+    
+    #df_all_annotations[['label','quality']] = df_all_annotations_['label'].str.split('_',expand=True)
+    #df_all_annotations['label'] = df_all_annotations['label'].replace({'BPAFAB':'BOAFAB','PHUCUV':'PHYCUV'})
+    #df_all_annotations['quality'] = df_all_annotations['quality'].replace({'FAR':'F','MED':'M','CLR':'C'})
+    #df_all_annotations['label_duration'] = df_all_annotations['max_t'] - df_all_annotations['min_t']
+
+    return df_all_annotations
+
 
 def get_absence_slots_from_presence_rois(df, 
                                         wl, 
