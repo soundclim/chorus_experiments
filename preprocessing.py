@@ -1,4 +1,4 @@
-
+import shutil
 import numpy as np
 import pandas as pd
 
@@ -9,13 +9,13 @@ from itertools import groupby
 from operator import itemgetter
 
 from maad.util import read_audacity_annot
+from librosa import get_duration, load
 from sklearn.model_selection import train_test_split
 
 from utils import batch_format_rois
 from utils import batch_write_samples
 
-def load_annotations(path_annot, 
-                     verbose=False):
+def load_annotations(path_annot):
     
     """
     Load all audacity annotations on a folder
@@ -24,7 +24,6 @@ def load_annotations(path_annot,
     ----------
     path_annot : str
         Path where annotations are located
-    ...
     Returns
     -------
     df_all_annotations : pandas.core.frame.DataFrame
@@ -32,56 +31,26 @@ def load_annotations(path_annot,
     """
     
     annotation_files = [f for f in listdir(path_annot) if isfile(join(path_annot, f))]
-    """
-    It is clean and useful use this part?
-    if verbose:
-        print('Number of files:',len(annotation_files))
-        files = [i.split('.')[-1] for i in annotation_files]
-        print('Fortmats:',set(files))
-        print()
-        print('Frequency of files:',pd.Series(files).value_counts())
-        files_names = [i.split('.')[0] for i in annotation_files]
-        print()
-        print('Unique names:',len(files_names))
-    """
+    
     fnames_list = []
     df_all_annotations = pd.DataFrame()
+    # TODO: avoid for loops, list comprenhension and multiprocessing
     for file in annotation_files:
-        # It is clean and useful use this part?
-        #y, sr = sound.load(recordings_folder+file.split('.')[0]+'.wav')
-        #duration = round(get_duration(y=y, sr=sr))
-        #if sr != 22050:
-        #    print(sr, file)
-        #if duration != 60:
-        #    print(duration, file)
-        #Sxx_power, tn, fn, ext = sound.spectrogram(s, fs, nperseg=1024, noverlap=1024//2)
-        #Sxx_db = power2dB(Sxx_power) + 96 # why 96?
         df_annotation_file = read_audacity_annot(path_annot+file) 
-        #df_rois = format_features(df_rois, tn, fn) # neccesary????????????
         fnames_list.extend([file.split('.')[0]]*df_annotation_file.shape[0])
         df_all_annotations = df_all_annotations.append(df_annotation_file,ignore_index=True) 
     
     df_all_annotations.insert(loc=0, column='fname', value=fnames_list)
     df_all_annotations['min_t'] = np.floor(df_all_annotations['min_t'])
     df_all_annotations['max_t'] = np.ceil(df_all_annotations['max_t'])
+
     df_all_annotations = df_all_annotations.sort_values(by=['fname','min_t','max_t'],ignore_index=True)
     
-    # This part could be included in the dashboard or other part!
-    #df_all_annotations[['site','date']] = df_all_annotations['fname'].str.split('_',1)
-    #df_all_annotations['date'] = df_all_annotations['date'].str.split('_').apply(lambda x: x[0]+x[1])
-    #df_all_annotations['date'] = pd.to_datetime(df_all_annotations['date'])
-    
-    #df_all_annotations[['label','quality']] = df_all_annotations_['label'].str.split('_',expand=True)
-    #df_all_annotations['label'] = df_all_annotations['label'].replace({'BPAFAB':'BOAFAB','PHUCUV':'PHYCUV'})
-    #df_all_annotations['quality'] = df_all_annotations['quality'].replace({'FAR':'F','MED':'M','CLR':'C'})
-    #df_all_annotations['label_duration'] = df_all_annotations['max_t'] - df_all_annotations['min_t']
-
     return df_all_annotations
-
 
 def get_absence_slots_from_presence_rois(df, 
                                         wl, 
-                                        max_duration):
+                                          ):
     
     """
     Compute the complement of ROIs in a dataframe. It is assumed that complemement means 'ABSENCE' class
@@ -93,18 +62,18 @@ def get_absence_slots_from_presence_rois(df,
         comes from audacity annotations. The columns are 'min_t', 'max_t', 'fname', and 'label' 
     wl : int
         Window length. In general is the same as the window lenght used in df
-    max_duration : int
-        Total length of raw recordings. It assumes that all recordings have the same duration
     Returns
     -------
     df_absence_slots : pandas.core.frame.DataFrame
         Dataframe composed of the recordings complement of df. The label is 'ABSENCE'
     """
-    
+
     df['segment_label'] = df.apply(lambda x: list(range(int(x['min_t']),int(x['max_t']+1))),axis=1)
-    df = df.groupby(['fname'])['segment_label'].apply(sum).to_frame().reset_index()
-    df['absence_space'] = df['segment_label'].apply(lambda x: sorted(set(range(max_duration+1))-set(x)))
-    
+    df_segment = df.groupby(['fname'])['segment_label'].apply(sum).to_frame().reset_index()
+    df_max = df.groupby(['fname'])['max_t'].max().to_frame()
+    df = pd.merge(df_segment, df_max, on='fname', how='left')
+    df['absence_space'] = df.apply(lambda x: sorted(set(range(int(x['max_t'])+1))-set(x['segment_label'])),axis=1)
+
     absence_slots = []
     for idx, x in df.iterrows():
         sub_segments = [list(map(itemgetter(1), g)) for k, g in groupby(enumerate(x['absence_space']),
@@ -141,8 +110,38 @@ def get_available_files(wav_path,
     
     files_in_planilha = set(df_planilha['gravacao_id'])
     files_in_folder = set([f.split('.wav')[0] for f in listdir(wav_path) if isfile(join(wav_path, f))])
-    file_in_both = files_in_planilha & files_in_folder
     
+    files_in_both = list(files_in_planilha & files_in_folder)
+    files_in_both = [f for f in files_in_both if isinstance(f, str)]
+    # TODO: Fix corrupted files
+        
+    """
+    corrupted_files =  ['INCT20955_20200220_033000',
+                         'INCT20955_20200314_050000',
+                         'INCT20955_20200315_011500',
+                         'INCT20955_20200325_221500',
+                         'INCT20955_20200326_011500',
+                         'INCT20955_20200326_050000',
+                         'INCT20955_20200326_180000',
+                         'INCT20955_20200331_041500',
+                         'INCT20955_20200331_201500',
+                         'INCT20955_20200331_221500',
+                         'INCT20955_20200407_020000',
+                         'INCT20955_20200407_200000',
+                         'INCT20955_20200407_230000',
+                         'INCT20955_20200411_001500',
+                         'INCT20955_20200411_031500',
+                         'INCT20955_20200411_191500',
+                         'INCT20955_20200411_221500',
+                         'INCT20955_20200417_174500',
+                         'INCT20955_20200420_193000']
+     """
+        
+    files_in_both, max_duration = map(list,zip(*[(file,get_duration(load(join(wav_path, 
+                                    file)+'.wav')[0],22050)) for file in files_in_both]))
+    files_in_both, max_duration = map(list,zip(*[(files_in_both[index],
+                                    max_duration[index]) for index, time in enumerate(max_duration) if time>57]))
+        
     #if report:
         # df_planilha['absence'].value_counts()
         # check if gravacao in planilha not annotated
@@ -154,13 +153,12 @@ def get_available_files(wav_path,
         # check if some recording not identified in planilha
         # (absence_in_planilha | gravacao_in_planilha)-recordings
     
-    return list(file_in_both)
+    return files_in_both, max_duration
 
 
 def get_absence_slots_from_planilha(n_sample,
                                     wav_path, # call function or use output as parameter?
                                     wl,
-                                    max_duration,
                                     site,
                                     labels_cols):
     
@@ -175,8 +173,6 @@ def get_absence_slots_from_planilha(n_sample,
         Path of folder that contains recording files. We expect .wav format 
     wl : int
         Window length. In general is the same as the window lenght used in df
-    max_duration : int
-        Total length of raw recordings. It assumes that all recordings have the same duration
     site : list
         Total length of raw recordings. It assumes that all recordings have the same duration
     labels_cols : list
@@ -191,13 +187,16 @@ def get_absence_slots_from_planilha(n_sample,
                              'Phy_cuv':'PHYCUV'}
     # Dont use quality annotation, just the species
     labels_cols = list(set([i.split('_',1)[0] for i in labels_cols]))
-    available_recordings = get_available_files(wav_path)
+    available_recordings, max_duration = get_available_files(wav_path)
+    
+    d_max_duration = {'fname': available_recordings, 'max_t': max_duration}
+    df_max_duration = pd.DataFrame(data=d_max_duration)
     
     df_planilha = pd.read_excel('data/Planilha_INCT_Anderson_Selvino.xlsx',
                                 engine='openpyxl')
     df_planilha = df_planilha.rename(columns=dictionary_of_species)
     df_planilha = df_planilha[df_planilha['gravador'].isin(site)]
-    df_planilha = df_planilha[df_planilha['gravacao_id'].isin(available_recordings)]
+    df_planilha = df_planilha[df_planilha['gravacao_id'].isin(available_recordings)].drop_duplicates(subset=['gravacao_id'])
     df_planilha = df_planilha[['gravacao_id']+labels_cols]
     df_planilha['label'] = df_planilha[labels_cols].sum(axis=1).apply(lambda x: 'ABSENCE' if x ==0 else 'PRESENCE')
     
@@ -205,12 +204,14 @@ def get_absence_slots_from_planilha(n_sample,
     df_planilha_absence = df_planilha_absence[['gravacao_id','label']]
     df_planilha_absence = df_planilha_absence.rename(columns={'gravacao_id':'fname'})
     df_planilha_absence['min_t'] = 0
-    df_planilha_absence['max_t'] = max_duration
+    print(df_planilha_absence.shape,df_max_duration.shape)
+    df_planilha_absence = pd.merge(df_planilha_absence,df_max_duration,on='fname', how='left')
+    print(df_planilha_absence.shape)
     # check if we could delete next two lines, In which cases it would be useful?
     df_planilha_absence['min_f'] = np.nan
     df_planilha_absence['max_f'] = np.nan
     
-    df_absence_rois_from_planilha = batch_format_rois(df_planilha_absence, wl=wl)
+    df_absence_rois_from_planilha = batch_format_rois(df_planilha_absence, wl=wl,wav_path=wav_path)
    
     return df_absence_rois_from_planilha.sample(n=n_sample)#, ignore_index=True)
 
@@ -250,186 +251,76 @@ def stratified_split_train_test(df,
 
     return df_compiled
 
-
-def build_binary_dataset(wav_path, 
-                         annotation_path, 
-                         wl, 
-                         target_sr, 
-                         flims, 
-                         max_duration,
-                         site,
-                         path_save, 
-                         labels_cols, 
-                         prefix,
-                         verbose=False):
+        
+def build_dataset(wav_path, 
+                 annotation_path, 
+                 wl, 
+                 target_sr, 
+                 flims, 
+                 site,
+                 path_save, 
+                 labels_cols, 
+                 prefix,
+                 verbose=False):
     """
-    # BEFORE DOCUMENTATION, SHOULD WE USE THIS PART AS A CLASS?
+    #SHOULD WE USE THIS PART AS A CLASS?
+    Create a dataset from raw fixed time recordings and annotations from audacity 
+    
     Parameters 
     ---------- 
-    wav_file : str
-        Path of recording file. 
-        We expect .wav format
-    annotation_file : str
-        Path of annotation file. 
-        We expect an annotation if .txt format from Audacity
-    
+    g : str
+        Path of recording file. We expect .wav format
+    annotation_path : str
+        Path of annotation file. We expect an annotation if .txt format from Audacity
     wl : int
         Fixed window lenght to split the recording
     target_sr : int
         Sampling rate to convert the audio file
     flims : list
-        List composed of [minimun_frequency, maximun_frequency] in Hz
+        tuple composed of (minimun_frequency, maximun_frequency) in Hz
+    site : list
+        Total length of raw recordings. It assumes that all recordings have the same duration
+    path_save : str
+        Path where the last folder is the place where preprocessed recordings and df_compiled is saved
     labels_cols : list
-        If False return multiclass dataset, in other case return dataset of label specified
+        list with str labels used in Audacity annotations
+    prefix : str
+        name of preprocessed recordings
+    verbose : bool
+        print checkpoints
         
     Returns 
     ------- 
     df_compiled : pandas.core.frame.DataFrame
-        Popurri
+        dataframe composed of each sample in the dataset, labels 
     """
 
-    df_all_annotations = load_annotations(path_annot=annotation_path, 
-                                          verbose=verbose)
+    df_all_annotations = load_annotations(path_annot=annotation_path)
     
     df_all_annotations = df_all_annotations[df_all_annotations['label'].isin(labels_cols)]
     
     df_presence_rois = batch_format_rois(df=df_all_annotations, 
-                                         wl=wl)
-
+                                         wl=wl,
+                                         wav_path=wav_path)
+    
     df_absence_slots = get_absence_slots_from_presence_rois(df=df_presence_rois, 
-                                                           wl=wl, 
-                                                           max_duration=max_duration)
-
+                                                           wl=wl)
+    
     df_absence_in_presence_files = batch_format_rois(df=df_absence_slots, 
-                                                     wl=wl)
-
-
-    df_dataset_presence = pd.concat([df_presence_rois,df_absence_in_presence_files])
+                                                     wl=wl,
+                                                    wav_path=wav_path)
 
     presence_samples = df_presence_rois.shape[0]
     absence_samples_in_presence_files = df_absence_in_presence_files.shape[0]
     absence_samples_in_absence_files = presence_samples - absence_samples_in_presence_files
-  
+    
     if absence_samples_in_absence_files>0:
         
-        df_absence_rois = get_absence_slots_from_planilha(n_sample=absence_samples_in_absence_files,
-                                                          wav_path=wav_path, 
-                                                          wl=wl,
-                                                          max_duration=max_duration,
-                                                          site=site,
-                                                          labels_cols=labels_cols)
-    else:
-        
-        df_absence_rois = absence_samples_in_absence_files.sample(n=presence_samples)
-
-    df_dataset = pd.concat([df_dataset_presence, df_absence_rois],
-                           ignore_index=True)
-
-    # check balanced df_dataset['label'].value_counts()
-
-    dataset_size = df_dataset.shape[0]
-    exponent_of_10 = int(np.ceil(np.log10(dataset_size)))
-    sample_names = prefix + df_dataset.index.astype(str).str.zfill(exponent_of_10) + '.wav'
-    df_dataset.insert(loc=0, 
-                      column='sample_name', 
-                      value=sample_names)
-    df_dataset['dummy'] = 1 
-    df_dataset = df_dataset.pivot_table('dummy', ['sample_name','fname','min_t','max_t'], 'label').fillna(0).reset_index()
-    df_dataset[['site','date']] = df_dataset['fname'].str.split('_',1,expand=True)
-    df_dataset['date'] = df_dataset['date'].str.split('_').apply(lambda x: x[0]+x[1])
-    df_dataset['date'] = pd.to_datetime(df_dataset['date'])
-    
-    if not exists(path_save):
-        makedirs(path_save)
-    
-    batch_write_samples(df_dataset, 
-                        wav_path=wav_path, 
-                        target_sr=target_sr,
-                        path_save=path_save,
-                        flims=flims, 
-                        verbose=True)
-    
-    df_compiled = stratified_split_train_test(df=df_dataset, 
-                                              x_name='sample_name', 
-                                              y_name=labels_cols[0])
-    
-    
-    samples_len = len([f for f in listdir(path_save) if isfile(join(path_save, f))])
-    df_len = df_compiled.shape[0]
-    
-    if samples_len==df_len:
-        df_compiled.to_csv(path_save+'df_train_test_files.csv', index=False)
-        print("Datased created in ", path_save)
-        return df_compiled
-        # save parameters
-    else:
-        warn("Different size between recordings extracted and samples!!")  
-        
-def build_binary_dataset(wav_path, 
-                         annotation_path, 
-                         wl, 
-                         target_sr, 
-                         flims, 
-                         max_duration,
-                         site,
-                         path_save, 
-                         labels_cols, 
-                         prefix,
-                         verbose=False):
-    """
-    # BEFORE DOCUMENTATION, SHOULD WE USE THIS PART AS A CLASS?
-    Parameters 
-    ---------- 
-    wav_file : str
-        Path of recording file. 
-        We expect .wav format
-    annotation_file : str
-        Path of annotation file. 
-        We expect an annotation if .txt format from Audacity
-    
-    wl : int
-        Fixed window lenght to split the recording
-    target_sr : int
-        Sampling rate to convert the audio file
-    flims : list
-        List composed of [minimun_frequency, maximun_frequency] in Hz
-    labels_cols : list
-        If False return multiclass dataset, in other case return dataset of label specified
-        
-    Returns 
-    ------- 
-    df_compiled : pandas.core.frame.DataFrame
-        Popurri
-    """
-
-    df_all_annotations = load_annotations(path_annot=annotation_path, 
-                                          verbose=verbose)
-    
-    df_all_annotations = df_all_annotations[df_all_annotations['label'].isin(labels_cols)]
-    
-    df_presence_rois = batch_format_rois(df=df_all_annotations, 
-                                         wl=wl)
-
-    df_absence_slots = get_absence_slots_from_presence_rois(df=df_presence_rois, 
-                                                           wl=wl, 
-                                                           max_duration=max_duration)
-
-    df_absence_in_presence_files = batch_format_rois(df=df_absence_slots, 
-                                                     wl=wl)
-
-
-    presence_samples = df_presence_rois.shape[0]
-    absence_samples_in_presence_files = df_absence_in_presence_files.shape[0]
-    absence_samples_in_absence_files = presence_samples - absence_samples_in_presence_files
-
-    if absence_samples_in_absence_files>0:
-
         df_dataset_presence = pd.concat([df_presence_rois,df_absence_in_presence_files])
 
         df_absence_rois_from_planilha = get_absence_slots_from_planilha(n_sample=absence_samples_in_absence_files,
                                                           wav_path=wav_path, 
                                                           wl=wl,
-                                                          max_duration=max_duration,
                                                           site=site,
                                                           labels_cols=labels_cols)
         
@@ -437,7 +328,9 @@ def build_binary_dataset(wav_path,
                            ignore_index=True)
     else:
         df_absence_in_presence_files = df_absence_in_presence_files.sample(n=presence_samples)
-        df_dataset = pd.concat([df_presence_rois,df_absence_in_presence_files])
+        
+        df_dataset = pd.concat([df_presence_rois,df_absence_in_presence_files],
+                              ignore_index=True)
 
     dataset_size = df_dataset.shape[0]
     exponent_of_10 = int(np.ceil(np.log10(dataset_size)))
@@ -447,36 +340,47 @@ def build_binary_dataset(wav_path,
                       value=sample_names)
     df_dataset['dummy'] = 1 
     df_dataset = df_dataset.pivot_table('dummy', ['sample_name','fname','min_t','max_t'], 'label').fillna(0).reset_index()
+    df_dataset = df_dataset.rename_axis(None, axis=1)
     df_dataset[['site','date']] = df_dataset['fname'].str.split('_',1,expand=True)
     df_dataset['date'] = df_dataset['date'].str.split('_').apply(lambda x: x[0]+x[1])
     df_dataset['date'] = pd.to_datetime(df_dataset['date'])
     
     df_compiled = stratified_split_train_test(df=df_dataset, 
                                               x_name='sample_name', 
-                                              y_name=labels_cols[0])
-    """
-    if not exists(path_save):
-        makedirs(path_save)
+                                              y_name=labels_cols)
    
-    batch_write_samples(df_dataset, 
+    path_save_audio = join(path_save, 'audio')
+
+    if not exists(path_save):
+        makedirs(path_save)   
+    if not exists(path_save_audio):
+        makedirs(path_save_audio)
+            
+    try:
+        batch_write_samples(df_compiled, 
                         wav_path=wav_path, 
                         target_sr=target_sr,
-                        path_save=path_save,
+                        path_save=path_save_audio,
                         flims=flims, 
                         verbose=True)
     
-   
-    
-    
-    samples_len = len([f for f in listdir(path_save) if isfile(join(path_save, f))])
-    df_len = df_compiled.shape[0]
-    
-    if samples_len==df_len:
-        df_compiled.to_csv(path_save+'df_train_test_files.csv', index=False)
-        print("Datased created in ", path_save)
-        return df_compiled
-        # save parameters
-    else:
-        warn("Different size between recordings extracted and samples!!")  
-    """
-    return df_compiled
+        samples_len = len([f for f in listdir(path_save_audio) if isfile(join(path_save_audio, f))])
+        df_len = df_compiled.shape[0]
+
+        if samples_len==df_len:
+            df_compiled.to_csv(path_save+'/df_train_test_files.csv', index=False)
+            print("Datased created in:", path_save) # TODO: save parameters        
+            make_archive(path_save,
+                        'zip',
+                        path_save.rsplit('/',1)[0],
+                        path_save.split('/')[-1])
+            return df_compiled   
+        else:
+            warn("Different size between recordings extracted and samples!!")
+            print('dataset samples:',df_len)
+            print('audio samples:',samples_len)
+            return df_compiled
+    except:
+        return df_dataset
+            
+
