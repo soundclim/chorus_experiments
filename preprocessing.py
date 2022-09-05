@@ -1,15 +1,17 @@
-import shutil
+
 import numpy as np
 import pandas as pd
 
-from warnings import warn
-from os import listdir, makedirs
-from os.path import isfile, join, exists
 from itertools import groupby
 from operator import itemgetter
+from os import listdir, makedirs
+from os.path import isfile, join, exists
+from shutil import make_archive
+from warnings import warn
 
 from maad.util import read_audacity_annot
 from librosa import get_duration, load
+
 from sklearn.model_selection import train_test_split
 
 from utils import batch_format_rois
@@ -70,7 +72,7 @@ def get_absence_slots_from_presence_rois(df,
 
     df['segment_label'] = df.apply(lambda x: list(range(int(x['min_t']),int(x['max_t']+1))),axis=1)
     df_segment = df.groupby(['fname'])['segment_label'].apply(sum).to_frame().reset_index()
-    df_max = df.groupby(['fname'])['max_t'].max().to_frame()
+    df_max = df.groupby(['fname'])['max_t'].max().to_frame() # if this is the max of the annotation, we should change for get_duration 
     df = pd.merge(df_segment, df_max, on='fname', how='left')
     df['absence_space'] = df.apply(lambda x: sorted(set(range(int(x['max_t'])+1))-set(x['segment_label'])),axis=1)
 
@@ -99,7 +101,7 @@ def get_available_files(wav_path,
      wav_path : str
         Path of folder that contains recording files. We expect .wav format 
      report : bool
-         Print report of coherence between planilha and recordings
+         Print reportmake_archive of coherence between planilha and recordings
      Returns
     -------
     df_absence_rois_from_planilha : pandas.core.frame.DataFrame
@@ -204,9 +206,7 @@ def get_absence_slots_from_planilha(n_sample,
     df_planilha_absence = df_planilha_absence[['gravacao_id','label']]
     df_planilha_absence = df_planilha_absence.rename(columns={'gravacao_id':'fname'})
     df_planilha_absence['min_t'] = 0
-    print(df_planilha_absence.shape,df_max_duration.shape)
     df_planilha_absence = pd.merge(df_planilha_absence,df_max_duration,on='fname', how='left')
-    print(df_planilha_absence.shape)
     # check if we could delete next two lines, In which cases it would be useful?
     df_planilha_absence['min_f'] = np.nan
     df_planilha_absence['max_f'] = np.nan
@@ -298,10 +298,11 @@ def build_dataset(wav_path,
     df_all_annotations = load_annotations(path_annot=annotation_path)
     
     df_all_annotations = df_all_annotations[df_all_annotations['label'].isin(labels_cols)]
-    
+        
     df_presence_rois = batch_format_rois(df=df_all_annotations, 
                                          wl=wl,
                                          wav_path=wav_path)
+    
     
     df_absence_slots = get_absence_slots_from_presence_rois(df=df_presence_rois, 
                                                            wl=wl)
@@ -313,7 +314,7 @@ def build_dataset(wav_path,
     presence_samples = df_presence_rois.shape[0]
     absence_samples_in_presence_files = df_absence_in_presence_files.shape[0]
     absence_samples_in_absence_files = presence_samples - absence_samples_in_presence_files
-    
+
     if absence_samples_in_absence_files>0:
         
         df_dataset_presence = pd.concat([df_presence_rois,df_absence_in_presence_files])
@@ -355,32 +356,32 @@ def build_dataset(wav_path,
         makedirs(path_save)   
     if not exists(path_save_audio):
         makedirs(path_save_audio)
-            
-    try:
-        batch_write_samples(df_compiled, 
-                        wav_path=wav_path, 
-                        target_sr=target_sr,
-                        path_save=path_save_audio,
-                        flims=flims, 
-                        verbose=True)
     
-        samples_len = len([f for f in listdir(path_save_audio) if isfile(join(path_save_audio, f))])
-        df_len = df_compiled.shape[0]
+    batch_write_samples(df_compiled, 
+                    wav_path=wav_path, 
+                    target_sr=target_sr,
+                    path_save=path_save_audio,
+                    flims=flims, 
+                    verbose=True)
 
-        if samples_len==df_len:
-            df_compiled.to_csv(path_save+'/df_train_test_files.csv', index=False)
-            print("Datased created in:", path_save) # TODO: save parameters        
-            make_archive(path_save,
-                        'zip',
-                        path_save.rsplit('/',1)[0],
-                        path_save.split('/')[-1])
-            return df_compiled   
-        else:
-            warn("Different size between recordings extracted and samples!!")
-            print('dataset samples:',df_len)
-            print('audio samples:',samples_len)
-            return df_compiled
-    except:
-        return df_dataset
+    samples_len = len([f for f in listdir(path_save_audio) if isfile(join(path_save_audio, f))])
+    df_len = df_compiled.shape[0]
+
+    if samples_len==df_len:
+        df_compiled.to_csv(path_save+'/df_train_test_files.csv', index=False)
+        print("Datased created in:", path_save) 
+        # TODO: save parameters   
+                
+        make_archive(path_save,
+                    'zip',
+                    path_save.rsplit('/',1)[0],
+                    path_save.split('/')[-1])
+        return df_compiled   
+    else:
+        warn("Different size between recordings extracted and samples!!")
+        print('dataset samples:',df_len)
+        print('audio samples:',samples_len)
+        return df_compiled
+
             
 
