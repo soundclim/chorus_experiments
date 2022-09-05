@@ -32,14 +32,15 @@ def spectrogram(df,
     try:
         X_img = np.asarray(X_img)
         X_img = np.reshape(X_img, (X_img.shape[0],X_img.shape[1],X_img.shape[2],1))
-        return X_img
+        
+        empty_img = [index for index,img in enumerate(X_img) if np.isnan(img).any()]
+        if len(empty_img)>1:
+            warn('Empty image!')
+        else:
+            print('Execution done. Final shape:',X_img.shape)
+            return X_img
+
     except:
+        warn('Check raw data!')
         return X_img
     
-    empty_img = [index for index,img in enumerate(X_img) if np.isnan(img).any()]
-    if len(empty_img)>1:
-        warn('Empty image!')
-    else:
-        print('Data shape:',X_img.shape)
-        
-    return X_img
