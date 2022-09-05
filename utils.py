@@ -148,9 +148,7 @@ def roi2windowed(wl, roi, fname, wav_path):
         Formated regions of interest with fixed size.
     """
     
-    #roi_len = (roi.max_t - roi.min_t)
-    max_f = get_duration(load(join(wav_path,fname)+'.wav')[0],22050)    
-    roi_len = (max_f - roi.min_t)
+    roi_len = (roi.max_t - roi.min_t)
     if roi_len < wl:
         # region shorter than window length
         roi_median = roi.min_t + roi_len/2
@@ -161,8 +159,8 @@ def roi2windowed(wl, roi, fname, wav_path):
     else:
         # region larger than window length
         # compute arrays. If more than 50% overlap remains, add a window
-        roi_fmt = pd.DataFrame({'min_t': np.arange(roi.min_t, max_f-wl+(wl/2), wl),
-                                 'max_t': np.arange(roi.min_t+wl, max_f+(wl/2), wl),
+        roi_fmt = pd.DataFrame({'min_t': np.arange(roi.min_t, roi.max_t-wl+(wl/2), wl),
+                                 'max_t': np.arange(roi.min_t+wl, roi.max_t+(wl/2), wl),
                                  'min_f': roi.min_f,
                                  'max_f': roi.max_f,
                                  'label': roi.label})
