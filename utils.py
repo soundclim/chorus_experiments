@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 from sklearn.metrics import confusion_matrix
 from maad import sound
-from librosa import feature
+from librosa import feature, get_duration, load
 from IPython.display import Audio
 from os import listdir
 from os.path import isfile, join
@@ -128,7 +128,7 @@ def plot_nn_history(history, epochs):
     
 # https://github.com/juansulloa/chorus/blob/main/utils/segmentation.py
     
-def roi2windowed(wl, roi):
+def roi2windowed(wl, roi, fname, wav_path):
     """
     Split a single region of interest (roi) into multiple regions of fixed size according
     to a window length. If window length (wl) is longer than the roi, the result is a single
@@ -147,8 +147,10 @@ def roi2windowed(wl, roi):
     roi_fmt : pandas.core.frame.DataFrame
         Formated regions of interest with fixed size.
     """
-    roi_len = (roi.max_t - roi.min_t)
     
+    #roi_len = (roi.max_t - roi.min_t)
+    max_f = get_duration(load(join(wav_path,fname)+'.wav')[0],22050)    
+    roi_len = (max_f - roi.min_t)
     if roi_len < wl:
         # region shorter than window length
         roi_median = roi.min_t + roi_len/2
@@ -159,67 +161,18 @@ def roi2windowed(wl, roi):
     else:
         # region larger than window length
         # compute arrays. If more than 50% overlap remains, add a window
-        roi_fmt = pd.DataFrame({'min_t': np.arange(roi.min_t, roi.max_t-wl+(wl/2), wl),
-                                 'max_t': np.arange(roi.min_t+wl, roi.max_t+(wl/2), wl),
+        roi_fmt = pd.DataFrame({'min_t': np.arange(roi.min_t, max_f-wl+(wl/2), wl),
+                                 'max_t': np.arange(roi.min_t+wl, max_f+(wl/2), wl),
                                  'min_f': roi.min_f,
                                  'max_f': roi.max_f,
                                  'label': roi.label})
     return roi_fmt
-
-
-def rois_windowed(wl, step, tlims=(0, 60), flims=(0, 22050), rois_annot=None, tn=None, fn=None):
-    """
-    Discretize audio signal into multiple segments and use manual annotations to label 
-    rois.
-    
-    Parameters
-    ----------
-    wl : float
-        Window length in seconds.
-    step : float
-        Step for winowed roi in seconds
-    tlims : tuple, optional
-        Temporal limits to create rois in seconds. The default is (0, 60).
-    flims : tuple, optional
-        Frequency limits to create rois in Hertz. The default is (0, 22050).
-    rois_annot : pandas DataFrame
-        regions of interest with annotations.
-    Returns
-    -------
-    rois : pandas Dataframe
-    """
-    # init rois windowed
-    rois = pd.DataFrame({'min_t': np.arange(tlims[0], tlims[1]-wl+1, step),
-                         'max_t': np.arange(tlims[0]+wl, tlims[1]+1, step),
-                         'min_f': flims[0],
-                         'max_f': flims[1],
-                         'label': '0'})
-    
-    rois = util.format_features(rois, tn, fn)
-    
-    # if no annotations provided, return windowed rois
-    if rois_annot is None:
-        return rois
-    
-    # if provided, add rois labels
-    for idx, row in rois_annot.iterrows():
-        if wl==step:
-            idx_min_t = (rois.min_t - row.min_t).abs().idxmin()
-            idx_max_t = (rois.max_t - row.max_t).abs().idxmin()
-            rois.loc[idx_min_t:idx_max_t, 'label'] = row.label
-        else:
-            print('TODO: correct assignment of labels when wl < step')
-            #idx_min_t = ((row.min_t - wl*0.5) - rois.min_t)<=0
-            #idx_max_t = ((row.max_t + wl*0.5) - rois.max_t)>=0
-            #rois.loc[idx_min_t & idx_max_t, 'label'] = row.label
-
-    return rois
         
-def batch_format_rois(df, wl):
+def batch_format_rois(df, wl, wav_path):
     """ format rois to a fixed length window"""
     rois_fmt = pd.DataFrame()
     for idx, roi in df.iterrows():
-        roi_fmt = roi2windowed(wl, roi)
+        roi_fmt = roi2windowed(wl, roi, fname=roi.fname, wav_path=wav_path)
         roi_fmt['fname'] = roi.fname
         rois_fmt = rois_fmt.append(roi_fmt)
 
@@ -245,8 +198,18 @@ def batch_write_samples(rois,
 
         fname_save = os.path.join(path_save, roi.sample_name)
         sound.write(fname_save, target_sr, s_normalized, bit_depth=16)
-         
-def batch_write_samples2(rois, 
+        
+"""        
+def preprocessing_audio_file_todo(s,fs):
+    
+    # Preprocessing operations
+    s_resampled = sound.resample(s, fs, target_sr)
+    s_filtered = sound.select_bandwidth(s_resampled,target_sr,fcut=flims, forder=5, fname ='butter', ftype='bandpass')
+    s_normalized = sound.normalize(s_filtered, max_amp=0.7)
+    
+    return s_normalized
+            
+def batch_write_samples_todo(rois, 
                         wav_path, 
                         target_sr,
                         path_save,
@@ -254,23 +217,22 @@ def batch_write_samples2(rois,
                         verbose=False):
     
     # TODO: Multiprocessing or avoid for loops
-    raw_files = rois.fname.unique()
+    raw_files = rois.fname.unique()   
     for raw_recording in raw_files:
         if verbose:
             print(find_file(roi.fname+'.wav', search_path=wav_path))
         s, fs = sound.load(find_file(raw_recording, search_path=wav_path))
-        # Preprocessing operations
-        s_resampled = sound.resample(s, fs, target_sr)
-        s_filtered = sound.select_bandwidth(s_resampled,target_sr,fcut=flims, forder=5, fname ='butter', ftype='bandpass')
-        s_normalized = sound.normalize(s_filtered, max_amp=0.7)
+        # https://joblib.readthedocs.io/en/latest/parallel.html
+        s_normalized = preprocessing_audio_file(s,fs)
         
         rois_from_file = rois[rois.fname.isin([raw_recording])]
         for idx, roi in rois_from_file.iterrows():
             # could we use as last step trim?
             s_trim = sound.trim(s_normalized, target_sr, min_t=roi.min_t, max_t=roi.max_t, pad=True)
             fname_save = os.path.join(path_save, roi.sample_name)
-            sound.write(fname_save, target_sr, s_normalized, bit_depth=16)        
-        
+            sound.write(fname_save, target_sr, s_normalized, bit_depth=16)
+"""
+
 def find_file(filename, search_path):
     """
     File searching tool. Searches a file with filename recurively in a directory.
