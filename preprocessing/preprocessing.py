@@ -266,6 +266,7 @@ def stratified_split_train_test(df,
                                 test_size=0.2):
     
     """
+    WARNING: PRONE TO DATA LEAKAGE WITH RECORDINGS
     Split dataset using stratified sampling and add a column called 'subset' 
     where specify if sample is in train or test subset.
     
@@ -304,6 +305,50 @@ def stratified_split_train_test(df,
     return df_compiled
 
 
+
+def assign_cross_validations_folds(df,
+                                 x_name, 
+                                 y_name,
+                                 column_group_name,
+                                 n_folds=5):
+    
+    """
+    Split dataset using StratifiedGroupKFold. Add a column called 'subset' 
+    where specify if sample is in train or test subset. Add one column called
+    'fold' where 0 fold is the test set.
+    
+    Parameters
+    ----------
+    df : pandas.core.frame.DataFrame
+        pandas Dataframe where each row correspond to one sample of the dataset
+    x_name : str
+        Name in columns to have a unique identifier in df
+    y_name : str
+        Name in columns of labels in df. This column is used to stratify
+    column_group_name : str
+        Name of column to group in df.
+    n_folds : int, defaul t=5
+        Number of folds. Must be at least 2.
+    Returns
+    -------
+    df : pandas.core.frame.DataFrame
+        pandas Dataframe with columns of fold and subset
+                                   
+    """
+
+    X = df[x_name]
+    y = df[y_name]
+    
+    groups = df[column_group_name]
+    sgkf = StratifiedGroupKFold(n_splits=n_folds+1)
+    
+    for folder_number, split_inds in enumerate(sgkf.split(X, y, groups=groups)):
+        test_inds = split_inds[-1]
+        df.loc[test_inds, 'fold'] = [folder_number]*len(test_inds)
+    
+    df['subset'] = df['fold'].apply(lambda x: 'test' if x==0 else 'train')
+
+    return df
 
 
         
