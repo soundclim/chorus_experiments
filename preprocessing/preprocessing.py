@@ -457,31 +457,17 @@ def build_dataset(wl,
     df_dataset_concat = df_dataset_concat.pivot(index=columns_name, 
                                                 columns='column_name_', 
                                                 values='dummy').fillna(0).reset_index()
-    df_dataset_concat = df_dataset_concat.rename_axis(None, axis=1)
-    
-    return df_dataset_concat
-    
-    """
-    
-    dataset_size = df_dataset_concat.shape[0]
-    exponent_of_10 = int(np.ceil(np.log10(dataset_size)))
-    sample_names = prefix + df_dataset_concat.index.astype(str).str.zfill(exponent_of_10) + '.wav'
-    df_dataset_concat.insert(loc=0, 
-                      column='sample_name', 
-                      value=sample_names)
-    df_dataset_concat['dummy'] = 1 
-    df_dataset_concat = df_dataset_concat.pivot_table('dummy', ['sample_name','fname','min_t','max_t'], 'label').fillna(0).reset_index()
-    df_dataset_concat = df_dataset_concat.rename_axis(None, axis=1)
-    
-    
+    df_dataset_concat = df_dataset_concat.rename_axis(None, axis=1)    
 
-    return df_dataset_concat
-    """
-    """    df_compiled = stratified_split_train_test(df=df_dataset, 
-                                                  x_name='sample_name', 
-                                                  y_name=labels_cols)
-
-        path_save_audio = join(path_save, 'audio')
+    df_dataset_cv = assign_cross_validations_folds(df=df_dataset_concat, 
+                                                 x_name='sample_name', 
+                                                 y_name='column_name',
+                                                 column_group_name='fname')
+    
+    complete_name_function = lambda x: x['sample_name'].split('.wav')[0] + '_FOLD_'+str(int(x['fold']))+'.wav'
+    df_dataset_cv['sample_name'] = df_dataset_cv.apply(complete_name_function,axis=1)
+    
+    path_save_audio = join(path_save, 'audio')
 
     if not exists(path_save):
         makedirs(path_save)   
