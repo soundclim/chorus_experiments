@@ -13,6 +13,7 @@ from maad.util import read_audacity_annot
 from librosa import get_duration, load
 
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedGroupKFold
 
 from utils import batch_format_rois
 from utils import batch_write_samples
@@ -40,7 +41,7 @@ def load_annotations(path_annot):
     for file in annotation_files:
         df_annotation_file = read_audacity_annot(path_annot+file) 
         fnames_list.extend([file.split('.')[0]]*df_annotation_file.shape[0])
-        df_all_annotations = df_all_annotations.append(df_annotation_file,ignore_index=True) 
+        df_all_annotations = pd.concat([df_all_annotations, df_annotation_file],ignore_index=True)
     
     df_all_annotations.insert(loc=0, column='fname', value=fnames_list)
     df_all_annotations['min_t'] = np.floor(df_all_annotations['min_t'])
@@ -261,10 +262,11 @@ def get_absence_slots_from_planilha(n_sample,
 
 def stratified_split_train_test(df, 
                                 x_name, 
-                                y_name):
+                                y_name,
+                                test_size=0.2):
     
     """
-    Split dataset using stratified sampling and add a column called 'dataset' 
+    Split dataset using stratified sampling and add a column called 'subset' 
     where specify if sample is in train or test subset.
     
     Parameters
@@ -272,28 +274,37 @@ def stratified_split_train_test(df,
     df : pandas.core.frame.DataFrame
         pandas Dataframe where each row correspond to one sample of the dataset
     x_name : str
-        Name in df of x values or id
+        Name in columns to have a unique identifier in df
     y_name : str
-        Name in df of y values or annotation. This value is used to stratify 
+        Name in columns of labels in df. This column is used to stratify
+    test_size : float or int, default=0.2
+        If float, should be between 0.0 and 1.0 and represent the proportion of the dataset to include in the test split. 
+        If int, represents the absolute number of test samples. If None, the value is set to the complement of the train 
+        size. Sames as scikit-learn
     Returns
     -------
     df_compiled : pandas.core.frame.DataFrame
         Formated regions of interest with fixed size
     """
+    from sklearn.model_selection import train_test_split
 
+    
     X = df[x_name]
     y = df[y_name]
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42, stratify=y)
 
     df_train = df.loc[X_train.index,:]
-    df_train['dataset'] = 'train'
+    df_train['subset'] = 'train'
     df_test = df.loc[X_test.index,:]
-    df_test['dataset'] = 'test'
+    df_test['subset'] = 'test'
 
     df_compiled = pd.concat([df_train, df_test], axis=0)
     df_compiled.sort_values('sample_name', inplace=True, ignore_index=True)
 
     return df_compiled
+
+
+
 
         
 def build_dataset(wl, 
@@ -379,8 +390,34 @@ def build_dataset(wl,
         df_all.append(df_dataset)
 
             
-    df_dataset_concat = pd.concat(df_all)
+    df_dataset_concat = pd.concat(df_all, ignore_index=False)
+    
+    df_dataset_concat[['species','quality']] = df_dataset_concat['label'].str.split('_',1,expand=True)
+    df_dataset_concat[['site','date']] = df_dataset_concat['fname'].str.split('_',1,expand=True)
+    df_dataset_concat['column_name'] = df_dataset_concat['site'] + '_' + df_dataset_concat['label']
+    df_dataset_concat['column_name_'] = df_dataset_concat['column_name']
+    df_dataset_concat['date'] = df_dataset_concat['date'].str.split('_').apply(lambda x: x[0]+x[1])
+    df_dataset_concat['date'] = pd.to_datetime(df_dataset_concat['date'])
 
+    dataset_size = df_dataset_concat.shape[0]
+    exponent_of_10 = int(np.ceil(np.log10(dataset_size)))
+    sample_names = prefix + df_dataset_concat.index.astype(str).str.zfill(exponent_of_10)  + '_' + df_dataset_concat['column_name'].values + '.wav'
+
+    df_dataset_concat.insert(loc=0, 
+                          column='sample_name', 
+                          value=sample_names)
+
+    df_dataset_concat['dummy'] = 1 
+    columns_name = ['sample_name','fname','min_t','max_t','label','species','quality','site','date','column_name']
+    df_dataset_concat = df_dataset_concat.pivot(index=columns_name, 
+                                                columns='column_name_', 
+                                                values='dummy').fillna(0).reset_index()
+    df_dataset_concat = df_dataset_concat.rename_axis(None, axis=1)
+    
+    return df_dataset_concat
+    
+    """
+    
     dataset_size = df_dataset_concat.shape[0]
     exponent_of_10 = int(np.ceil(np.log10(dataset_size)))
     sample_names = prefix + df_dataset_concat.index.astype(str).str.zfill(exponent_of_10) + '.wav'
@@ -390,12 +427,11 @@ def build_dataset(wl,
     df_dataset_concat['dummy'] = 1 
     df_dataset_concat = df_dataset_concat.pivot_table('dummy', ['sample_name','fname','min_t','max_t'], 'label').fillna(0).reset_index()
     df_dataset_concat = df_dataset_concat.rename_axis(None, axis=1)
-    df_dataset_concat[['site','date']] = df_dataset_concat['fname'].str.split('_',1,expand=True)
-    df_dataset_concat['date'] = df_dataset_concat['date'].str.split('_').apply(lambda x: x[0]+x[1])
-    df_dataset_concat['date'] = pd.to_datetime(df_dataset_concat['date'])
+    
+    
 
     return df_dataset_concat
-
+    """
     """    df_compiled = stratified_split_train_test(df=df_dataset, 
                                                   x_name='sample_name', 
                                                   y_name=labels_cols)
