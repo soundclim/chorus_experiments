@@ -172,7 +172,7 @@ def batch_format_rois(df, wl, wav_path):
     for idx, roi in df.iterrows():
         roi_fmt = roi2windowed(wl, roi, fname=roi.fname, wav_path=wav_path)
         roi_fmt['fname'] = roi.fname
-        rois_fmt = rois_fmt.append(roi_fmt)
+        rois_fmt = pd.concat([rois_fmt,roi_fmt],ignore_index=True)
 
     rois_fmt.reset_index(inplace=True, drop=True)
     return rois_fmt
