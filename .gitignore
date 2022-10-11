@@ -6,3 +6,9 @@ data/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+
+#Other files
+.amlignore
+.amlignore.amltmp
+.gitignore.amltmp
+.ipynb_aml_checkpoints
