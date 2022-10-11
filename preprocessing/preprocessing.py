@@ -255,7 +255,8 @@ def get_absence_slots_from_planilha(n_sample,
     print(df_absence_rois_from_planilha.shape)
     
     if n_sample>df_absence_rois_from_planilha.shape[0]:
-        warn('We want ' +str(n_sample)+ 'samples but only have'+ str(df_absence_rois_from_planilha.shape[0]))
+        message = 'We want ' +str(n_sample)+ 'samples but only have'+ str(df_absence_rois_from_planilha.shape[0])
+        warn(message)
         return df_absence_rois_from_planilha
     else:
         return df_absence_rois_from_planilha.sample(n=n_sample)#, ignore_index=True)
@@ -383,7 +384,7 @@ def build_dataset(wl,
         
     Returns 
     ------- 
-    df_compiled : pandas.core.frame.DataFrame
+    df_dataset_cv : pandas.core.frame.DataFrame
         dataframe composed of each sample in the dataset, labels 
     """
     df_all = []
@@ -435,19 +436,20 @@ def build_dataset(wl,
         df_all.append(df_dataset)
 
             
-    df_dataset_concat = pd.concat(df_all, ignore_index=False)
+    df_dataset_concat = pd.concat(df_all, ignore_index=True)
     
     df_dataset_concat[['species','quality']] = df_dataset_concat['label'].str.split('_',1,expand=True)
     df_dataset_concat[['site','date']] = df_dataset_concat['fname'].str.split('_',1,expand=True)
+    df_dataset_concat['label'] = df_dataset_concat['label'].str.replace('_C$', '_M',regex=True)
     df_dataset_concat['column_name'] = df_dataset_concat['site'] + '_' + df_dataset_concat['label']
     df_dataset_concat['column_name_'] = df_dataset_concat['column_name']
     df_dataset_concat['date'] = df_dataset_concat['date'].str.split('_').apply(lambda x: x[0]+x[1])
     df_dataset_concat['date'] = pd.to_datetime(df_dataset_concat['date'])
-
+    
     dataset_size = df_dataset_concat.shape[0]
     exponent_of_10 = int(np.ceil(np.log10(dataset_size)))
     sample_names = prefix + df_dataset_concat.index.astype(str).str.zfill(exponent_of_10)  + '_' + df_dataset_concat['column_name'].values + '.wav'
-
+    
     df_dataset_concat.insert(loc=0, 
                           column='sample_name', 
                           value=sample_names)
@@ -467,25 +469,33 @@ def build_dataset(wl,
     complete_name_function = lambda x: x['sample_name'].split('.wav')[0] + '_FOLD_'+str(int(x['fold']))+'.wav'
     df_dataset_cv['sample_name'] = df_dataset_cv.apply(complete_name_function,axis=1)
     
+    return df_dataset_cv
+    
+    print('Finalized df construction')
     path_save_audio = join(path_save, 'audio')
-
-    if not exists(path_save):
-        makedirs(path_save)   
+ 
     if not exists(path_save_audio):
         makedirs(path_save_audio)
+        print('Folder created:', path_save_audio)
+        
+    for site in site_list:
+        
+        print('Saving files for site:',site)
+        wav_path = 'data/raw/site_name/recordings/'
+        wav_path = wav_path.replace('site_name',site)
     
-    batch_write_samples(df_compiled, 
-                    wav_path=wav_path, 
-                    target_sr=target_sr,
-                    path_save=path_save_audio,
-                    flims=flims, 
-                    verbose=True)
-
+        batch_write_samples(df_dataset_cv[df_dataset_cv['site']==site], 
+                        wav_path=wav_path, 
+                        target_sr=target_sr,
+                        path_save=path_save_audio,
+                        flims=flims, 
+                        verbose=True)
+    print('Last checking')
     samples_len = len([f for f in listdir(path_save_audio) if isfile(join(path_save_audio, f))])
-    df_len = df_compiled.shape[0]
+    df_len = df_dataset_cv.shape[0]
 
     if samples_len==df_len:
-        df_compiled.to_csv(path_save+'/df_train_test_files.csv', index=False)
+        df_dataset_cv.to_csv(path_save+'/df_train_test_files.csv', index=False)
         print("Datased created in:", path_save) 
         # TODO: save parameters   
                 
@@ -493,12 +503,10 @@ def build_dataset(wl,
                     'zip',
                     path_save.rsplit('/',1)[0],
                     path_save.split('/')[-1])
-        return df_compiled   
+        return df_dataset_cv   
     else:
         warn("Different size between recordings extracted and samples!!")
         print('dataset samples:',df_len)
         print('audio samples:',samples_len)
-        return df_compiled """
-
-            
+        return df_dataset_cv 
 
