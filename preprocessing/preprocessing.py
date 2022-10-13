@@ -17,6 +17,7 @@ from sklearn.model_selection import StratifiedGroupKFold
 
 from utils import batch_format_rois
 from utils import batch_write_samples
+from utils import readme_generator
 
 def load_annotations(path_annot):
     
@@ -441,43 +442,48 @@ def build_dataset(wl,
     df_dataset_concat[['species','quality']] = df_dataset_concat['label'].str.split('_',1,expand=True)
     df_dataset_concat[['site','date']] = df_dataset_concat['fname'].str.split('_',1,expand=True)
     df_dataset_concat['label'] = df_dataset_concat['label'].str.replace('_C$', '_M',regex=True)
-    df_dataset_concat['column_name'] = df_dataset_concat['site'] + '_' + df_dataset_concat['label']
-    df_dataset_concat['column_name_'] = df_dataset_concat['column_name']
+    df_dataset_concat['class'] = df_dataset_concat['site'] + '_' + df_dataset_concat['label']
+    df_dataset_concat['class_'] = df_dataset_concat['class']
     df_dataset_concat['date'] = df_dataset_concat['date'].str.split('_').apply(lambda x: x[0]+x[1])
     df_dataset_concat['date'] = pd.to_datetime(df_dataset_concat['date'])
     
     dataset_size = df_dataset_concat.shape[0]
     exponent_of_10 = int(np.ceil(np.log10(dataset_size)))
-    sample_names = prefix + df_dataset_concat.index.astype(str).str.zfill(exponent_of_10)  + '_' + df_dataset_concat['column_name'].values + '.wav'
+    sample_names = prefix + df_dataset_concat.index.astype(str).str.zfill(exponent_of_10)  + '_' + df_dataset_concat['class'].values + '.wav'
     
     df_dataset_concat.insert(loc=0, 
                           column='sample_name', 
                           value=sample_names)
-
-    df_dataset_concat['dummy'] = 1 
-    columns_name = ['sample_name','fname','min_t','max_t','label','species','quality','site','date','column_name']
-    df_dataset_concat = df_dataset_concat.pivot(index=columns_name, 
-                                                columns='column_name_', 
-                                                values='dummy').fillna(0).reset_index()
-    df_dataset_concat = df_dataset_concat.rename_axis(None, axis=1)    
-
+    
     df_dataset_cv = assign_cross_validations_folds(df=df_dataset_concat, 
                                                  x_name='sample_name', 
-                                                 y_name='column_name',
+                                                 y_name='class',
                                                  column_group_name='fname')
-    
+
+    df_dataset_cv['dummy'] = 1 
+    columns_name = ['sample_name','fname','min_t','max_t','label',
+                    'species','quality','site','date','class','fold','subset']
+    df_dataset_cv = df_dataset_cv.pivot(index=columns_name, 
+                                                columns='class_', 
+                                                values='dummy').fillna(0).reset_index()
+    df_dataset_cv = df_dataset_cv.rename_axis(None, axis=1)    
+
     complete_name_function = lambda x: x['sample_name'].split('.wav')[0] + '_FOLD_'+str(int(x['fold']))+'.wav'
     df_dataset_cv['sample_name'] = df_dataset_cv.apply(complete_name_function,axis=1)
     
-    return df_dataset_cv
-    
+    columns_as_int = ['min_t','max_t','fold'] + list(df_dataset_cv.columns[12:])
+    df_dataset_cv[columns_as_int] = df_dataset_cv[columns_as_int].astype(int)
+        
     print('Finalized df construction')
+    
     path_save_audio = join(path_save, 'audio')
  
     if not exists(path_save_audio):
         makedirs(path_save_audio)
         print('Folder created:', path_save_audio)
         
+    readme_generator(df_dataset_cv,name=path_save,sr=target_sr,wl=wl,flims=flims)
+      
     for site in site_list:
         
         print('Saving files for site:',site)
