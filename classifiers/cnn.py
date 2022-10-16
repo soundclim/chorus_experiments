@@ -14,7 +14,7 @@ class CNNetwork_2D(nn.Module):
                 stride=1,
                 padding=2
             ),
-            nn.ReLu(),
+            nn.ReLU(),
             nn.MaxPool2d(kernel_size=2)
         )
         self.conv2 = nn.Sequential(
@@ -25,7 +25,7 @@ class CNNetwork_2D(nn.Module):
                 stride=1,
                 padding=2
             ),
-            nn.ReLu(),
+            nn.ReLU(),
             nn.MaxPool2d(kernel_size=2)
         )
         self.conv3 = nn.Sequential(
@@ -36,7 +36,7 @@ class CNNetwork_2D(nn.Module):
                 stride=1,
                 padding=2
             ),
-            nn.ReLu(),
+            nn.ReLU(),
             nn.MaxPool2d(kernel_size=2)
         )
         self.conv1 = nn.Sequential(
@@ -47,7 +47,7 @@ class CNNetwork_2D(nn.Module):
                 stride=1,
                 padding=2
             ),
-            nn.ReLu(),
+            nn.ReLU(),
             nn.MaxPool2d(kernel_size=2)
         )
         self.flatten = nn.Flatten()
