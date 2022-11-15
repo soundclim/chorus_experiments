@@ -52,7 +52,7 @@ class AnuraSet(Dataset):
     
     def _resample_if_necessary(self, signal, sr):
         if sr != self.target_sample_rate:
-            resampleer = torchaudio.transforms.Resample(sr, self.target_sample_rate).cuda()
+            resampler = torchaudio.transforms.Resample(sr, self.target_sample_rate).cuda()
             signal = resampler(signal)
         return signal
     
@@ -72,10 +72,12 @@ class AnuraSet(Dataset):
     
 
 if __name__ == "__main__":
-    ANNOTATIONS_FILE = "data/BuildDataset/datasetv2-multiclass_1/df_train_test_files.csv"
-    AUDIO_DIR = "data/BuildDataset/datasetv2-multiclass_1/audio"
+    #ANNOTATIONS_FILE = "data/BuildDataset/datasetv2-multiclass_1/df_train_test_files.csv"
+    ANNOTATIONS_FILE = "Users/jscanass/chorus_experiments/data/BuildDataset/datasetv2-multiclass_1/df_train_test_files.csv"
+    #AUDIO_DIR = ".../data/BuildDataset/datasetv2-multiclass_1/audio"
+    AUDIO_DIR = "Users/jscanass/chorus_experiments/data/BuildDataset/datasetv2-multiclass_1/audio"
     SAMPLE_RATE = 22050
-    NUM_SAMPLES = 66150
+    NUM_SAMPLES = SAMPLE_RATE*3
     
     if torch.cuda.is_available():
         device = "cuda"
@@ -98,4 +100,3 @@ if __name__ == "__main__":
     print(f"There are {len(anurasetv2)} samples in the dataset.")
     
     signal, label = anurasetv2[0]
-    
