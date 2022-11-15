@@ -1,26 +1,25 @@
-
+from CNN_Network import network
+from utils import plot_confusion_matrix, plot_listen_examples, plot_nn_history
 
 def create_seed():
     return random.randint(1, 1e6)
-
-
-
 
 def classifier(method,
               path_audio,
               path_anntations,
               path_results
               ):
+    return None    
+    
+def Basic_NN(df, 
+             X_img,
+             path_results,
+             epochs = 10, #50
+             batch_size = 8, #use 128
+             plot_results = False
+            ):
     
     
-    
-    
-    
-def Basic_NN(df, X_img):
-    
-    
-
-# Check shape
     print ('X_train:',X_train.shape)
     print ('Y_train:',Y_train.shape)
     print ()
@@ -28,7 +27,7 @@ def Basic_NN(df, X_img):
     print ('Y_val:',Y_val.shape)
 
     # Call backs to save weights
-    filepath= "experiments/weights_{}.hdf5".format(seed)
+    filepath= path_results+"/weights_{}.hdf5".format(seed)
     checkpoint = ModelCheckpoint(filepath, monitor='val_accuracy',verbose=1, save_best_only=True, mode='max')
     #callbacks_list = [checkpoint]
 
@@ -88,14 +87,14 @@ def Basic_NN(df, X_img):
     performance.append(val_acc)
     performance.append(end-start)
 
-    np.savetxt('experiments/train_test_performance_{}.txt'.format(seed), np.asarray(performance), fmt='%f') 
+    np.savetxt(path_results+'/train_test_performance_{}.txt'.format(seed), np.asarray(performance), fmt='%f') 
 
-    with open('experiments/history_{}.txt'.format(seed), 'wb') as file_out:
+    with open(path_results+'/history_{}.txt'.format(seed), 'wb') as file_out:
         pickle.dump(history.history, file_out)
 
     #print('Iteration {} ended...'.format(experiment_id))
     print('Results saved to:')
-    print('Experiments/train_test_performance_{}.txt'.format(seed))
+    print(path_results+'/train_test_performance_{}.txt'.format(seed))
     print('-------------------')
     sleep(1)
     

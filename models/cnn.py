@@ -39,7 +39,7 @@ class CNNetwork_2D(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=2)
         )
-        self.conv1 = nn.Sequential(
+        self.conv4 = nn.Sequential(
             nn.Conv2d(
                 in_channels=64,
                 out_channels=128,
@@ -51,7 +51,7 @@ class CNNetwork_2D(nn.Module):
             nn.MaxPool2d(kernel_size=2)
         )
         self.flatten = nn.Flatten()
-        self.linear = nn.Linear(128 * 5 * 4, 10)
+        self.linear = nn.Linear(6400, 18)
         self.softmax = nn.Softmax(dim=1)
         
     def forward(self, input_data):
@@ -60,10 +60,12 @@ class CNNetwork_2D(nn.Module):
         x = self.conv3(x)
         x = self.conv4(x)
         x = self.flatten(x)
+        print(x.shape)
         logits = self.linear(x)
         predictions = self.softmax(logits)
         return predictions 
 
+
 if __name__ == "__main__":
     cnn = CNNetwork_2D()
-    summary(cnn.cuda(), (1, 64, 130))
+    summary(cnn.cuda(), (1, 64, 44))
