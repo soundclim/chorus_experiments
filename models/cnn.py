@@ -60,7 +60,6 @@ class CNNetwork_2D(nn.Module):
         x = self.conv3(x)
         x = self.conv4(x)
         x = self.flatten(x)
-        print(x.shape)
         logits = self.linear(x)
         predictions = self.softmax(logits)
         return predictions 
@@ -68,4 +67,4 @@ class CNNetwork_2D(nn.Module):
 
 if __name__ == "__main__":
     cnn = CNNetwork_2D()
-    summary(cnn.cuda(), (1, 64, 44))
+    summary(cnn.cuda(), (1, 64, 130))
