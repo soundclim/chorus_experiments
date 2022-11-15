@@ -5,7 +5,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from anuraset import AnuraSet 
-from classifiers.cnn import CNNetwork_2D
+from models.cnn import CNNetwork_2D
 
 BATCH_SIZE = 128
 EPOCHS = 10
@@ -18,8 +18,8 @@ os.chdir(DIR_VSCODE)
 ANNOTATIONS_FILE = "data/BuildDataset/datasetv2-multiclass_1/df_train_test_files.csv"
 AUDIO_DIR = "data/BuildDataset/datasetv2-multiclass_1/audio"
 SAMPLE_RATE = 22050
-NUM_SAMPLES = 66150
-
+NUM_SAMPLES = SAMPLE_RATE*3
+MODEL = 'CNN_2NETWORK'
 
 def create_data_loader(train_data, batch_size):
     train_dataloader = DataLoader(train_data, batch_size=batch_size)
@@ -27,9 +27,9 @@ def create_data_loader(train_data, batch_size):
 
 
 def train_single_epoch(model, data_loader, loss_fn, optimiser, device):
-    for inputs, targets in data_loader:
-        inputs, targets = inputs.to(device), targets.to(device)
-        
+    for input, target in data_loader:
+        input, target = input.to(device), target.to(device)
+
         # calculate loss
         prediction = model(input)
         loss = loss_fn(prediction, target)
@@ -41,14 +41,12 @@ def train_single_epoch(model, data_loader, loss_fn, optimiser, device):
 
     print(f"loss: {loss.item()}")
 
-
 def train(model, data_loader, loss_fn, optimiser, device, epochs):
     for i in range(epochs):
         print(f"Epoch {i+1}")
         train_single_epoch(model, data_loader, loss_fn, optimiser, device)
         print("---------------------------")
     print("Finished training")
-
 
 if __name__ == "__main__":
 
@@ -73,10 +71,9 @@ if __name__ == "__main__":
 
     train_dataloader = create_data_loader(anurasetv2, BATCH_SIZE)
 
-
     cnn = CNNetwork_2D().to(device)
     print(cnn)
-
+    
     # initialise loss funtion + optimiser
     loss_fn = nn.CrossEntropyLoss()
     optimiser = torch.optim.Adam(cnn.parameters(),
