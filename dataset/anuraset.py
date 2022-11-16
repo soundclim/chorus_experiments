@@ -10,12 +10,15 @@ class AnuraSet(Dataset):
     
     def __init__(self, 
                  annotations_file, 
+                 train,
                  audio_dir, 
                  transformation,
                  target_sample_rate,
                  num_samples,
                  device):
+    
         self.annotations = pd.read_csv(annotations_file)
+        self.train = train
         self.audio_dir = audio_dir
         self.device = device
         self.transformation = transformation.to(self.device)
@@ -62,7 +65,7 @@ class AnuraSet(Dataset):
         return signal
     
     def _get_audio_sample_path(self, index):
-        #fold = f"fold{self.annotations.iloc[index, 10]}"
+        fold = f"fold{self.annotations.iloc[index, 10]}"
         #path = os.path.join(self.audio_dir, fold, self.annotations.iloc[index, 0])
         path = os.path.join(self.audio_dir, self.annotations.iloc[index, 0])
         return path
