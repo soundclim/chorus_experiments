@@ -4,8 +4,8 @@ import torchaudio
 from torch import nn
 from torch.utils.data import DataLoader
 
-from anuraset import AnuraSet 
-from models.cnn import CNNetwork_2D
+from Users.jscanass.chorus_experiments.dataset.anuraset import AnuraSet 
+from Users.jscanass.chorus_experiments.models.example_cnn.cnn import CNNetwork_2D
 
 BATCH_SIZE = 128
 EPOCHS = 10

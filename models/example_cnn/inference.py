@@ -1,10 +1,10 @@
 import torch
 import torchaudio
 
-from anuraset import AnuraSet 
-from models.cnn import CNNetwork_2D
+from Users.jscanass.chorus_experiments.dataset.anuraset import AnuraSet 
+from Users.jscanass.chorus_experiments.models.example_cnn.cnn import CNNetwork_2D
 
-from train import AUDIO_DIR, ANNOTATIONS_FILE, SAMPLE_RATE, NUM_SAMPLES
+from Users.jscanass.chorus_experiments.models.example_cnn.train import AUDIO_DIR, ANNOTATIONS_FILE, SAMPLE_RATE, NUM_SAMPLES
 
 class_mapping = [
     'INCT41_ABSENCE', 'INCT20955_ABSENCE', 'INCT20955_BOAFAB_M',
