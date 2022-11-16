@@ -1,5 +1,5 @@
 from CNN_Network import network
-from utils import plot_confusion_matrix, plot_listen_examples, plot_nn_history
+from Users.jscanass.chorus_experiments.utils.utils import plot_confusion_matrix, plot_listen_examples, plot_nn_history
 
 def create_seed():
     return random.randint(1, 1e6)
