@@ -63,7 +63,6 @@ def plot_listen_examples(path_audio,
     
     return file
 
-
 def plot_confusion_matrix(y_true, y_pred, classes,
                           normalize=False,
                           title='Confusion matrix',
@@ -124,8 +123,7 @@ def plot_nn_history(history, epochs):
     plt.plot(epochs_range, val_loss, label='Validation Loss')
     plt.legend(loc='upper right')
     plt.title('Training and Validation Loss')
-
-    
+ 
 # https://github.com/juansulloa/chorus/blob/main/utils/segmentation.py
     
 def roi2windowed(wl, roi, fname, wav_path):
