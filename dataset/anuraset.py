@@ -13,11 +13,25 @@ class AnuraSet(Dataset):
                  train,
                  audio_dir, 
                  transformation,
-                 target_sample_rate,
+                 target_sample_rate,subset_label,fold,
                  num_samples,
                  device):
+
+        #self.annotations = pd.read_csv(annotations_file)
+        annotations_df = pd.read_csv(annotations_file)
+        #df=annotations_df[annotations_df['subset']==subset_label]
+        if subset_label=='train':
+            df=annotations_df[annotations_df['subset']==subset_label]
+            self.annotations = df[df['fold']!=fold]  #select training  samples
+        elif subset_label=='test':
+            df=annotations_df[annotations_df['subset']==subset_label]
+            self.annotations = df[df['fold']==0]  #select  test samples
+        elif subset_label=='val':
+            df=annotations_df[annotations_df['subset']=='train']
+            self.annotations = df[df['fold']==fold]  #select one fold to validate
+        elif subset_label=='training_for_test':
+            self.annotations = annotations_df[annotations_df['subset']=='train']
     
-        self.annotations = pd.read_csv(annotations_file)
         self.train = train
         self.audio_dir = audio_dir
         self.device = device
