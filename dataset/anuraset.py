@@ -10,29 +10,32 @@ class AnuraSet(Dataset):
     
     def __init__(self, 
                  annotations_file, 
-                 train,
                  audio_dir, 
                  transformation,
-                 target_sample_rate,subset_label,fold,
+                 target_sample_rate,
                  num_samples,
-                 device):
+                 dataset_subset,
+                 device,
+                 val_fold=None,
+                 keywords=[]):
 
         #self.annotations = pd.read_csv(annotations_file)
         annotations_df = pd.read_csv(annotations_file)
+        if keywords:
+            annotations_df = annotations_df[annotations_df['class'].str.contains('|'.join(keywords))]
         #df=annotations_df[annotations_df['subset']==subset_label]
-        if subset_label=='train':
-            df=annotations_df[annotations_df['subset']==subset_label]
-            self.annotations = df[df['fold']!=fold]  #select training  samples
-        elif subset_label=='test':
-            df=annotations_df[annotations_df['subset']==subset_label]
+        if dataset_subset=='train':
+            df=annotations_df[annotations_df['subset']==dataset_subset]
+            self.annotations = df[df['fold']!=val_fold]  #select training  samples
+        elif dataset_subset=='test':
+            df=annotations_df[annotations_df['subset']==dataset_subset]
             self.annotations = df[df['fold']==0]  #select  test samples
-        elif subset_label=='val':
+        elif dataset_subset=='val':
             df=annotations_df[annotations_df['subset']=='train']
-            self.annotations = df[df['fold']==fold]  #select one fold to validate
-        elif subset_label=='training_for_test':
+            self.annotations = df[df['fold']==val_fold]  #select one fold to validate
+        elif dataset_subset=='training_for_test':
             self.annotations = annotations_df[annotations_df['subset']=='train']
     
-        self.train = train
         self.audio_dir = audio_dir
         self.device = device
         self.transformation = transformation.to(self.device)
