@@ -1,4 +1,4 @@
-from CNN_Network import network
+from Users.jscanass.chorus_experiments.models.cnn_keras.CNN_Network import network
 from Users.jscanass.chorus_experiments.utils.utils import plot_confusion_matrix, plot_listen_examples, plot_nn_history
 
 def create_seed():

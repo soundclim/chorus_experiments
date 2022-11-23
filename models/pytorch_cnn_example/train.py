@@ -4,8 +4,8 @@ import torchaudio
 from torch import nn
 from torch.utils.data import DataLoader
 
-from Users.jscanass.chorus_experiments.dataset.anuraset import AnuraSet 
-from Users.jscanass.chorus_experiments.models.example_cnn.cnn import CNNetwork_2D
+from dataset.anuraset import AnuraSet
+from models.example_cnn_pytorch.cnn import CNNetwork_2D
 
 BATCH_SIZE = 128
 EPOCHS = 10
@@ -20,6 +20,9 @@ AUDIO_DIR = "data/BuildDataset/datasetv2-multiclass_1/audio"
 SAMPLE_RATE = 22050
 NUM_SAMPLES = SAMPLE_RATE*3
 MODEL = 'CNN_2NETWORK'
+DATASET_SUBSET = 'training_for_test'
+VALIDATION_FOLD = None
+
 
 def create_data_loader(train_data, batch_size):
     train_dataloader = DataLoader(train_data, batch_size=batch_size)
@@ -63,11 +66,14 @@ if __name__ == "__main__":
         n_mels=64
     )
     anurasetv2 = AnuraSet(ANNOTATIONS_FILE, 
-                          AUDIO_DIR, 
-                          mel_spectrogram,
-                          SAMPLE_RATE,
-                          NUM_SAMPLES,
-                          device)
+                            AUDIO_DIR, 
+                            mel_spectrogram,
+                            SAMPLE_RATE,
+                            NUM_SAMPLES,
+                            DATASET_SUBSET,
+                            device,
+                            VALIDATION_FOLD,
+                            )
 
     train_dataloader = create_data_loader(anurasetv2, BATCH_SIZE)
 
