@@ -230,7 +230,9 @@ fetch_anuraset_v2 = _make_fetcher(
     doc="Download the ANURA dataset")
 
 # Example to download the anuraset v2 by using the default fetcher
+'''
 fetch_anuraset_v2()
+'''
 
 # Example to download the anuraset v2 using a customized fetcher
 '''
