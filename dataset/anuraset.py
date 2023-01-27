@@ -1,12 +1,28 @@
 import os
 import torch
-import pandas as pd
-import tqdm as notebook_tqdm
 import torchaudio
+import pandas as pd
 
 from torch.utils.data import Dataset
 
 class AnuraSet(Dataset):
+    """ AnuraSet🐸: A dataset for bioacoustic classification of tropical anurans
+
+    Args:
+        annotations_file (string): path of the metadata csv table with labels of 
+            AnuraSet and audio samples information
+        audio_dir(string): path of the folder with audio samples of the AnuraSet
+            associated with the metadata table
+        transformation (callable?): L A function/transform that takes audios before 
+            feature extraction and reutnrs a transformed version.This tranformantions 
+            include melspectogram and augmentations.
+        target_sample_rate (int): sample rate to use in an internal preprocessing
+            to modify audio samples 
+        num_samples (int): number of samples to use in an internal preprocessing
+            of the class to adjust the size of the samples 
+        train (bool): If True, creates dataset from using 'train' samples in the 
+                'subset' column of the metadata
+    """
     
     def __init__(self, 
                  annotations_file, 
@@ -14,28 +30,18 @@ class AnuraSet(Dataset):
                  transformation,
                  target_sample_rate,
                  num_samples,
-                 dataset_subset,
                  device,
-                 val_fold=None,
-                 keywords=[]):
+                 train=True,
+                ):
 
-        #self.annotations = pd.read_csv(annotations_file)
-        annotations_df = pd.read_csv(annotations_file)
-        if keywords:
-            annotations_df = annotations_df[annotations_df['class'].str.contains('|'.join(keywords))]
-        #df=annotations_df[annotations_df['subset']==subset_label]
-        if dataset_subset=='train':
-            df=annotations_df[annotations_df['subset']==dataset_subset]
-            self.annotations = df[df['fold']!=val_fold]  #select training  samples
-        elif dataset_subset=='test':
-            df=annotations_df[annotations_df['subset']==dataset_subset]
-            self.annotations = df[df['fold']==0]  #select  test samples
-        elif dataset_subset=='val':
-            df=annotations_df[annotations_df['subset']=='train']
-            self.annotations = df[df['fold']==val_fold]  #select one fold to validate
-        elif dataset_subset=='training_for_test':
-            self.annotations = annotations_df[annotations_df['subset']=='train']
-    
+        df = pd.read_csv(annotations_file)
+        
+        if train:
+            df = df[df['subset']=='train']
+        else:
+            df = df[df['subset']=='test']
+        
+        self.annotations = df 
         self.audio_dir = audio_dir
         self.device = device
         self.transformation = transformation.to(self.device)
@@ -82,20 +88,19 @@ class AnuraSet(Dataset):
         return signal
     
     def _get_audio_sample_path(self, index):
-        fold = f"fold{self.annotations.iloc[index, 10]}"
-        #path = os.path.join(self.audio_dir, fold, self.annotations.iloc[index, 0])
         path = os.path.join(self.audio_dir, self.annotations.iloc[index, 0])
         return path
     
     def _get_audio_sample_label(self, index):
-        return self.annotations.iloc[index,9]
-    
+        return torch.Tensor(self.annotations.iloc[index,8:])
+
 
 if __name__ == "__main__":
-    #ANNOTATIONS_FILE = "data/BuildDataset/datasetv2-multiclass_1/df_train_test_files.csv"
-    ANNOTATIONS_FILE = "Users/jscanass/chorus_experiments/data/BuildDataset/datasetv2-multiclass_1/df_train_test_files.csv"
-    #AUDIO_DIR = ".../data/BuildDataset/datasetv2-multiclass_1/audio"
-    AUDIO_DIR = "Users/jscanass/chorus_experiments/data/BuildDataset/datasetv2-multiclass_1/audio"
+    # Modify to your parent directory
+    #DIR_VSCODE = "/mnt/batch/tasks/shared/LS_root/mounts/clusters/gpu-baseline/code/Users/jscanass/"
+    os.chdir(DIR_VSCODE)
+    ANNOTATIONS_FILE = 'anurasetv3/ametadata.csv' 
+    AUDIO_DIR =  "anurasetv3/audio/"
     SAMPLE_RATE = 22050
     NUM_SAMPLES = SAMPLE_RATE*3
     
@@ -111,12 +116,25 @@ if __name__ == "__main__":
         hop_length=512,
         n_mels=64
     )
-    anurasetv2 = AnuraSet(ANNOTATIONS_FILE, 
-                          AUDIO_DIR, 
-                          mel_spectrogram,
-                          SAMPLE_RATE,
-                          NUM_SAMPLES,
-                          device)
-    print(f"There are {len(anurasetv2)} samples in the dataset.")
     
-    signal, label = anurasetv2[0]
+    training_data = AnuraSet(
+        annotations_file=ANNOTATIONS_FILE, 
+        audio_dir=AUDIO_DIR, 
+        transformation=mel_spectrogram,
+        target_sample_rate=SAMPLE_RATE,
+        num_samples=NUM_SAMPLES,
+        device=device,
+        train=True
+                        )
+    print(f"There are {len(training_data)} samples in the training set.")
+
+    test_data = AnuraSet(
+        annotations_file=ANNOTATIONS_FILE, 
+        audio_dir=AUDIO_DIR, 
+        transformation=mel_spectrogram,
+        target_sample_rate=SAMPLE_RATE,
+        num_samples=NUM_SAMPLES,
+        device=device,
+        train=False
+                        )
+    print(f"There are {len(test_data)} samples in the test set.")
