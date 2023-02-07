@@ -3,7 +3,6 @@ import contextlib
 import logging
 import tarfile
 import zipfile
-
 import os.path as op
 from os.path import join as pjoin
 from hashlib import md5
@@ -218,7 +217,8 @@ fetch_test = _make_fetcher(
     ['lv_0_20221201072652.mp4'],
     ['lv_0_20221201072652.mp4'],
     ['84704a5b5ce57a36b4c391b7edacb4c7'],
-    doc="Download the TEST dataset")
+    doc="Download the TEST dataset",
+    unzip=True)
 
 fetch_anuraset_v2 = _make_fetcher(
     "fetch_anuraset_v2",
@@ -227,12 +227,23 @@ fetch_anuraset_v2 = _make_fetcher(
     ['datasetv2-multiclass_1.zip'],
     ['datasetv2-multiclass_1.zip'],
     ['e1fc835fac6ee7973ee307ae64a584e6'],
-    doc="Download the ANURA dataset")
+    doc="Download the ANURA dataset version 2",
+    unzip=True)
+
+fetch_anuraset_v3 = _make_fetcher(
+    "fetch_anuraset_v3",
+    pjoin(home, 'anuraset_v3'),
+    ANURA_PUBLIC_URL,
+    ['anurasetv3.zip'],
+    ['anurasetv3.zip'],
+    ['64c86512f338b1a0cf2ff2d4c603b30a'],
+    doc="Download the ANURA dataset version 3",
+    unzip=True)
 
 # Example to download the anuraset v2 by using the default fetcher
-'''
-fetch_anuraset_v2()
-'''
+#'''
+fetch_anuraset_v3()
+#'''
 
 # Example to download the anuraset v2 using a customized fetcher
 '''
