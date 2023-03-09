@@ -12,6 +12,7 @@ def get_client(account_name, account_key, container_name):
     @param account_name: Name of Storage Account
     @param account_key: Key access to the Storage Account
     @param container_name: Name of the container
+
     @return: A instance of a container client
 
     """
@@ -34,14 +35,16 @@ def get_client(account_name, account_key, container_name):
 
 def get(prefix=None, name_start_with=None, ext=None, output_dir=None, parent_folder=None, download=True):
     """
+    Get data from an Azure Storage account according a filtering rules
 
     @param prefix: Prefix to the blob
-    @param name_start_with: Firts part of the blob name
-    @param ext: Extention of the blob
+    @param name_start_with: First part of the blob name
+    @param ext: Extension of the blob
     @param output_dir: Out put dir for the downloaded files
     @param parent_folder: Parent folder for the output dir
-    @param download: if file should be doawnloaded or not
-    @return:
+    @param download: if file should be downloaded or not
+
+    @return: None if download parameter is True, if not, return a list of blob name according the filtering rules
     """
 
     client = get_client(account_name='chorus', account_key=KEY, container_name=CONTAINER_NAME)
@@ -88,6 +91,16 @@ def get(prefix=None, name_start_with=None, ext=None, output_dir=None, parent_fol
 
 
 def get_annotation(site, type='bounding', download=True):
+    """
+    Get annotation according to the type
+
+    @param site: ID of the location
+    @param type: Type of annotation (bounding or presence)
+    @param download: If data should be downloaded or not
+
+    @return: None if download parameter is True, if not, return a list of blob name according the filtering rules
+    """
+
     if type == 'bounding':
         output = get(prefix=PREFIX_ANNOTATIONS_BOUNDING_BOX, name_start_with=site, ext='txt', output_dir='annotation',
                      parent_folder=site, download=download)
@@ -100,6 +113,16 @@ def get_annotation(site, type='bounding', download=True):
 
 
 def get_environmental_variables(site, type=None, download=True):
+    """
+    Get environmental variables according to the type
+
+    @param site: ID of the location
+    @param type: Type of environmental variable (planetary or weather)
+    @param download: If data should be downloaded or not
+
+    @return: None if download parameter is True, if not, return a list of blob name according the filtering rules
+    """
+
     if type == 'planetary':
         output = get(prefix=PREFIX_ENVIRONMENTAL_VARIABLES_PLANETARYCOMPUTER, name_start_with=site, ext='csv',
                      output_dir='enviromental', parent_folder=site, download=download)
@@ -112,6 +135,15 @@ def get_environmental_variables(site, type=None, download=True):
 
 
 def get_dataloggers(site=None, download=True):
+    """
+    Get dataloggers for a particular location
+
+    @param site: ID of the location
+    @param download: If data should be downloaded or not
+
+    @return: None if download parameter is True, if not, return a list of blob name according the filtering rules
+
+    """
     if site is not None:
         output = get(prefix=PREFIX_DATALOGGERS[site], name_start_with=site, ext='xlsx', output_dir='dataloggers',
                      parent_folder=site, download=download)
@@ -121,6 +153,15 @@ def get_dataloggers(site=None, download=True):
 
 
 def get_records(site=None, download=True):
+    """
+    Get records audio for a particular location
+
+    @param site: ID of the location
+    @param download: If data should be downloaded or not
+
+    @return: None if download parameter is True, if not, return a list of blob name according the filtering rules
+    """
+
     if site is not None:
         output = get(prefix=PREFIX_RECORDS[site], name_start_with=site, ext='wav', output_dir='records',
                      parent_folder=site, download=download)
@@ -130,6 +171,15 @@ def get_records(site=None, download=True):
 
 
 def get_raw_data(site=None):
+    """
+    Get complete available data for a particular location (audios, datalogger, annotation and environmental variables)
+
+    @param site: ID of the location
+
+    @return: None
+
+    """
+
     if site is not None:
         get_annotation(site, type='bounding')
         get_annotation(site, type='presence')
@@ -143,6 +193,13 @@ def get_raw_data(site=None):
 
 
 def get_data_by_filename(file_name_list):
+    """
+    Download blob given a list of blob names
+    @param file_name_list: List of blob names to download
+
+    @return: None
+    """
+
     if file_name_list is None:
         raise Exception('file_name_list should a not empty list of file names')
     else:
