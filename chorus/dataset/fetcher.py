@@ -242,7 +242,7 @@ fetch_anuraset_v3 = _make_fetcher(
 
 # Example to download the anuraset v2 by using the default fetcher
 #'''
-fetch_anuraset_v3()
+#fetch_anuraset_v3()
 #'''
 
 # Example to download the anuraset v2 using a customized fetcher

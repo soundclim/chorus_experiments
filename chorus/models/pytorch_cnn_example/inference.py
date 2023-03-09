@@ -1,7 +1,7 @@
 import torch
 import torchaudio
 
-from dataset.anuraset import AnuraSet 
+from chorus.dataset.anuraset import AnuraSet
 from example_cnn_pytorch.cnn import CNNetwork_2D
 
 from example_cnn_pytorch.train import AUDIO_DIR, ANNOTATIONS_FILE, SAMPLE_RATE, NUM_SAMPLES
