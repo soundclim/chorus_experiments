@@ -1,6 +1,6 @@
 # Chorus: Machine listening to monitor climate change impacts on neotropical amphibians
 
-Repository with several machine learning models to detect species on audio data, using the [AnuraSet](https://github.com/jscanass/AnuraSet).
+Repository with several machine learning models to detect species on audio data using the [AnuraSet](https://github.com/jscanass/AnuraSet).
 
 ## Installation instructions
 
