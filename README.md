@@ -14,26 +14,14 @@ conda activate chorus_env
 pip install -r requirements.txt
 ```
 
-3. Download dataset
+3. Download the [AnuraSet](https://github.com/jscanass/AnuraSet)
 
-TODO
 
-```bash
-sh download_dataset/download_dataset.sh 
-```
+## Acknowledgments
+The authors acknowledge financial support from the intergovernmental Group on Earth Observations (GEO) and Microsoft, under the GEO-Microsoft Planetary Computer Programme (October 2021).
 
-This downloads the [AnuraSet](https://github.com/jscanass/AnuraSet) to the `datasets/AnuraSetr` folder.
+## Contact
 
-## Reproduce results
+- Juan Sebastián Ulloa (julloa@humboldt.org.co, [juansulloa](https://github.com/juansulloa))
+- Juan Sebastián Cañas (jcanas@humboldt.org.co, [jscanass](https://github.com/jscanass))
 
-TODO
-
-1. Train
-
-```bash
-python audio_classifier/train.py --config configs/exp_resnet18.yaml
-```
-
-2. Test/inference
-
-@CV4Ecology participants: Up to you to figure that one out. :)
